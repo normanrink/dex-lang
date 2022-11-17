@@ -1,0 +1,508 @@
+<!DOCTYPE HTML>
+<html><head><meta charset="UTF-8"><style type="text/css">/* Copyright 2019 Google LLC                              */
+/*                                                        */
+/* Use of this source code is governed by a BSD-style     */
+/* license that can be found in the LICENSE file or at    */
+/* https://developers.google.com/open-source/licenses/bsd */
+
+body {
+  font-family: Helvetica, sans-serif;
+  font-size: 100%;
+  color: #333;
+  display: flex;
+  justify-content: space-between;
+  overflow-x: hidden;
+
+  --main-width: 50rem;
+  --nav-width: 20rem;
+}
+
+@media (max-width: 70rem) {
+    /*For narrow screens hide nav and enable horizontal scrolling */
+    nav {display: none;}
+    body {overflow-x: auto;}
+}
+
+nav {/* this actually just holds space for #navbar, which is fixed */
+  min-width: var(--nav-width);
+  max-width: var(--nav-width);
+}
+#navbar {
+  position: fixed;
+  height: 100vh;
+  width: var(--nav-width);
+  overflow-y: scroll;
+  border-right: 1px solid firebrick;
+}
+#navbar:before {
+  content: "Contents";
+  font-weight: bold;
+}
+nav ol {
+  list-style-type:none;
+  padding-left: 1rem;
+}
+
+#main-output {
+  max-width: var(--main-width);
+  margin: auto;
+}
+
+.cell {
+}
+
+.code-block, .err-block, .result-block {
+  padding: 0em 0em 0em 2em;
+  display: block;
+  font-family: monospace;
+  white-space: pre;
+}
+
+code {
+  background-color: #F0F0F0;
+}
+
+.result-block {
+  border-left: 3px solid  #87CEFA;
+}
+
+.prose-block {
+  line-height: 140%;
+}
+
+.err-block {
+  font-weight: bold;
+  color: #B22222;
+  border-left: 3px solid #B22222;
+}
+
+.plot {
+  padding: 5em;
+}
+
+.plot-img {
+  width: 80%;
+}
+
+.comment {
+  color: #808080;
+}
+
+.keyword {
+  color: #0000DD;
+}
+
+.command {
+  color: #A80000;
+}
+
+.symbol {
+  color: #E07000;
+}
+
+.type-name {
+  color: #A80000;
+}
+
+.iso-sugar {
+  color: #25BBA7;
+}
+</style><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css"><script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.js"></script><script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/contrib/auto-render.min.js" onload="// Copyright 2019 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
+var katexOptions = {
+    delimiters: [
+        {left: &quot;$$&quot;, right: &quot;$$&quot;, display: true},
+        {left: &quot;\\[&quot;, right: &quot;\\]&quot;, display: true},
+        {left: &quot;$&quot;, right: &quot;$&quot;, display: false},
+        {left: &quot;\\(&quot;, right: &quot;\\)&quot;, display: false}
+    ],
+    // Enable commands that load resources or change HTML attributes
+    // (e.g. hyperlinks): https://katex.org/docs/security.html.
+    trust: true
+};
+
+var cells = {};
+
+function append_contents(key, contents) {
+    if (key in cells) {
+        var cur_cells = cells[key];
+    } else {
+        var cell = document.createElement(&quot;div&quot;);
+        cell.className = &quot;cell&quot;;
+        cells[key] = [cell];
+        var cur_cells = [cell];
+    }
+    for (var i = 0; i &lt; contents.length; i++) {
+        for (var j = 0; j &lt; cur_cells.length; j++) {
+            var node = lookup_address(cur_cells[j], contents[i][0])
+            node.innerHTML += contents[i][1];
+        }
+    }
+}
+
+function lookup_address(cell, address) {
+    var node = cell
+    for (i = 0; i &lt; address.length; i++) {
+        node = node.children[address[i]]
+    }
+    return node
+}
+
+function renderLaTeX() {
+    // Render LaTeX equations in prose blocks via KaTeX, if available.
+    // Skip rendering if KaTeX is unavailable.
+    if (typeof renderMathInElement == &#39;undefined&#39;) {
+        return;
+    }
+    // Render LaTeX equations in prose blocks via KaTeX.
+    var proseBlocks = document.querySelectorAll(&quot;.prose-block&quot;);
+    Array.from(proseBlocks).map((proseBlock) =&gt;
+        renderMathInElement(proseBlock, katexOptions)
+    );
+}
+
+/**
+ * Rendering the Table of Contents / Navigation Bar
+ * 2 key functions
+ *  - `updateNavigation()` which inserts/updates the navigation bar
+ *  - and it&#39;s helper `extractStructure()` which extracts the structure of the page
+ *    and adds ids to heading elements.
+*/
+function updateNavigation() {
+    function navItemList(struct) {
+        var listEle = document.createElement(&#39;ol&#39;)
+        struct.children.forEach(childStruct=&gt;
+            listEle.appendChild(navItem(childStruct))
+        );
+        return listEle;
+    }
+    function navItem(struct) {
+        var a = document.createElement(&#39;a&#39;);
+        a.appendChild(document.createTextNode(struct.text));
+        a.title = struct.text;
+        a.href = &quot;#&quot;+struct.id;
+
+        var ele = document.createElement(&#39;li&#39;)
+        ele.appendChild(a)
+        ele.appendChild(navItemList(struct));
+        return ele;
+    }
+
+    var navbarEle = document.getElementById(&quot;navbar&quot;)
+    if (navbarEle === null) {  // create it
+        navbarEle = document.createElement(&quot;div&quot;);
+        navbarEle.id=&quot;navbar&quot;;
+        navOuterEle = document.createElement(&quot;nav&quot;)
+        navOuterEle.appendChild(navbarEle);
+        document.body.prepend(navOuterEle);
+    }
+
+    navbarEle.innerHTML = &quot;&quot;
+    var structure = extractStructure()
+    navbarEle.appendChild(navItemList(structure));
+}
+
+function extractStructure() { // Also sets ids on h1,h2,...
+    var headingsNodes = document.querySelectorAll(&quot;h1, h2, h3, h4, h5, h6&quot;);
+    // For now we are just fulling going to regenerate the structure each time
+    // Might be better if we made minimal changes, but 🤷
+
+    // Extract the structure of the document
+    var structure = {children:[]}
+    var active = [structure.children];
+    headingsNodes.forEach(
+        function(currentValue, currentIndex) {
+            currentValue.id = &quot;s-&quot; + currentIndex;
+            var currentLevel = parseInt(currentValue.nodeName[1]);
+
+            // Insert dummy levels up for any levels that are skipped
+            for (var i=active.length; i &lt; currentLevel; i++) {
+                var dummy = {id: &quot;&quot;, text: &quot;&quot;, children: []}
+                active.push(dummy.children);
+                var parentList = active[i-1]
+                parentList.push(dummy);
+            }
+            // delete this level and everything after
+            active.splice(currentLevel, active.length);
+
+            var currentStructure = {
+                id: currentValue.id,
+                text: currentValue.textContent,
+                children: [],
+            };
+            active.push(currentStructure.children);
+
+            var parentList = active[active.length-2]
+            parentList.push(currentStructure);
+        },
+    );
+    return structure;
+}
+
+/**
+ * HTML rendering mode.
+ * Static rendering is used for static HTML pages.
+ * Dynamic rendering is used for dynamic HTML pages via `dex web`.
+ *
+ * @enum {string}
+ */
+var RENDER_MODE = Object.freeze({
+  STATIC: &quot;static&quot;,
+  DYNAMIC: &quot;dynamic&quot;,
+})
+
+/**
+ * Renders the webpage.
+ * @param {RENDER_MODE} renderMode The render mode, either static or dynamic.
+ */
+function render(renderMode) {
+    if (renderMode == RENDER_MODE.STATIC) {
+        // For static pages, simply call rendering functions once.
+        renderLaTeX();
+        updateNavigation();
+    } else {
+        // For dynamic pages (via `dex web`), listen to update events.
+        var source = new EventSource(&quot;/getnext&quot;);
+        source.onmessage = function(event) {
+            var body = document.getElementById(&quot;main-output&quot;);
+            var msg = JSON.parse(event.data);
+            if (msg == &quot;start&quot;) {
+                body.innerHTML = &quot;&quot;;
+                cells = {}
+                return
+            }
+            var order    = msg[0];
+            var contents = msg[1];
+            for (var i = 0; i &lt; contents.length; i++) {
+                append_contents(contents[i][0], contents[i][1]);
+            }
+            if (order != null) {
+                var new_cells = {};
+                body.innerHTML = &quot;&quot;;
+                for (var i = 0; i &lt; order.val.length; i++) {
+                    var key = order.val[i]
+                    var cur_cells = cells[key]
+                    if (cur_cells.length == 0) {
+                        var cur_cell = new_cells[key][0].cloneNode(true)
+                    } else {
+                        var cur_cell = cur_cells.pop()
+                        if (key in new_cells) {
+                            new_cells[key].push(cur_cell);
+                        } else {
+                            new_cells[key] = [cur_cell];
+                        }
+                    }
+                    body.appendChild(cur_cell);
+                }
+                Object.assign(cells, new_cells);
+            }
+            renderLaTeX();
+            updateNavigation();
+        };
+    }
+}
+render(RENDER_MODE.STATIC);"></script></head><body><div id="main-output"><div class="cell"><div class="code-block"></div></div><div class="cell"><div class="prose-block"><h1><a href="https://www.cs.toronto.edu/%7Egraves/icml_2006.pdf">Connectionist Temporal Classification</a></h1>
+<p>By Alex Graves <em>et alia</em>, 2006.</p>
+</div></div><div class="cell"><div class="prose-block"><p>This algorithm computes the probability of a sequence of labels
+(without pauses included) given another sequence of label probabilities
+(with pauses included), marginalizing over all possible combination of
+pause lengths.
+It's used for training speech-to-text models on unaligned training data.</p>
+</div></div><div class="cell"><div class="prose-block"><p>Most implementations of CTC compute the log marginal likelihood
+and its gradients through a separate forward and a backward pass.
+However, Dex's autodiff can produce the backward
+pass automatically.  That makes this code much shorter than
+most implementations.</p>
+</div></div><div class="cell"><div class="code-block"><span class="keyword">import</span> stats  <span class="comment">-- for log-space representation of probabilities.
+</span></div></div><div class="cell"><div class="code-block">
+
+</div></div><div class="cell"><div class="prose-block"><h2>Custom index sets</h2>
+</div></div><div class="cell"><div class="prose-block"><h3>Fence and Posts</h3>
+<p>Here we create a custom datatype and index set
+that interleaves the elements of a table with another set
+of values representing all the spaces in between those elements.</p>
+</div></div><div class="cell"><div class="code-block"><span class="keyword">data</span> <span class="type-name">FenceAndPosts</span> n [<span class="type-name">Ix</span> n] <span class="symbol">=</span>
+  <span class="type-name">Fence</span> n
+  <span class="type-name">Posts</span> (<span class="type-name">Post</span> n)
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">Ix</span> (<span class="type-name">FenceAndPosts</span> a) <span class="keyword">given</span> {a}
+  size <span class="symbol">=</span> 2 <span class="symbol">*</span> size a <span class="symbol">+</span> 1
+  ordinal <span class="symbol">=</span> <span class="symbol">\</span>i<span class="symbol">.</span> <span class="keyword">case</span> i <span class="keyword">of</span>
+    <span class="type-name">Fence</span> j <span class="symbol">-&gt;</span> 2 <span class="symbol">*</span> ordinal j <span class="symbol">+</span> 1
+    <span class="type-name">Posts</span> j <span class="symbol">-&gt;</span> 2 <span class="symbol">*</span> ordinal j
+  unsafe_from_ordinal <span class="symbol">=</span> <span class="symbol">\</span>o<span class="symbol">.</span>
+    <span class="keyword">case</span> is_odd o <span class="keyword">of</span>
+      <span class="type-name">True</span>  <span class="symbol">-&gt;</span> <span class="type-name">Fence</span> <span class="symbol">$</span> unsafe_from_ordinal _ (intdiv2 o)
+      <span class="type-name">False</span> <span class="symbol">-&gt;</span> <span class="type-name">Posts</span> <span class="symbol">$</span> unsafe_from_ordinal _ (intdiv2 o)
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">NonEmpty</span> (<span class="type-name">FenceAndPosts</span> a) <span class="keyword">given</span> {a}
+  first_ix <span class="symbol">=</span> unsafe_from_ordinal _ 0
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">Eq</span> (<span class="type-name">FenceAndPosts</span> a) <span class="keyword">given</span> {a} [<span class="type-name">Eq</span> a]
+  (<span class="symbol">==</span>) <span class="symbol">=</span> <span class="symbol">\</span>x y<span class="symbol">.</span> <span class="keyword">case</span> x <span class="keyword">of</span>
+    <span class="type-name">Fence</span> x <span class="symbol">-&gt;</span> <span class="keyword">case</span> y <span class="keyword">of</span>
+      <span class="type-name">Fence</span> y <span class="symbol">-&gt;</span> x <span class="symbol">==</span> y
+      <span class="type-name">Posts</span> y <span class="symbol">-&gt;</span> <span class="type-name">False</span>
+    <span class="type-name">Posts</span> x <span class="symbol">-&gt;</span> <span class="keyword">case</span> y <span class="keyword">of</span>
+      <span class="type-name">Fence</span> y <span class="symbol">-&gt;</span> <span class="type-name">False</span>
+      <span class="type-name">Posts</span> y <span class="symbol">-&gt;</span> ordinal x <span class="symbol">==</span> ordinal y
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><h4>Test FenceAndPosts</h4>
+</div></div><div class="cell"><div class="code-block">all <span class="symbol">$</span> <span class="keyword">for</span> i<span class="symbol">:</span>(<span class="type-name">FenceAndPosts</span> <span class="type-name">Bool</span>)<span class="symbol">.</span>
+  i <span class="symbol">==</span> (unsafe_from_ordinal _ <span class="symbol">$</span> ordinal i)
+</div><div class="result-block">True</div></div><div class="cell"><div class="code-block">
+
+</div></div><div class="cell"><div class="prose-block"><h3>All but First</h3>
+<p>Next we make an index set from any non-empty set
+that doesn't contain the first element.</p>
+</div></div><div class="cell"><div class="code-block"><span class="keyword">data</span> <span class="type-name">AllButFirst</span> n [<span class="type-name">NonEmpty</span> n] <span class="symbol">=</span>
+  <span class="type-name">MkAllButFirst</span> n
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">Ix</span> (<span class="type-name">AllButFirst</span> a) <span class="keyword">given</span> {a}
+  size <span class="symbol">=</span> unsafe_nat_diff (size a) 1
+  ordinal <span class="symbol">=</span> <span class="symbol">\</span>(<span class="type-name">MkAllButFirst</span> i)<span class="symbol">.</span> ordinal i
+  unsafe_from_ordinal <span class="symbol">=</span> <span class="symbol">\</span>o<span class="symbol">.</span> <span class="type-name">MkAllButFirst</span> <span class="symbol">$</span> unsafe_from_ordinal _ o
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">Subset</span> (<span class="type-name">AllButFirst</span> a) a <span class="keyword">given</span> {a}
+  inject&#39; <span class="symbol">=</span> <span class="symbol">\</span>x<span class="symbol">.</span> unsafe_from_ordinal _ ((ordinal x) <span class="symbol">+</span> 1)
+  project&#39; <span class="symbol">=</span> <span class="symbol">\</span>x<span class="symbol">.</span> <span class="keyword">case</span> (ordinal x) <span class="symbol">&gt;</span> 0 <span class="keyword">of</span>
+    <span class="type-name">True</span> <span class="symbol">-&gt;</span> unsafe_from_ordinal _ (unsafe_nat_diff (ordinal x) 1)
+    <span class="type-name">False</span> <span class="symbol">-&gt;</span> <span class="type-name">Nothing</span>
+  unsafe_project&#39; <span class="symbol">=</span> <span class="symbol">\</span>x<span class="symbol">.</span>
+    unsafe_from_ordinal _ (unsafe_nat_diff (ordinal x) 1)
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">Eq</span> (<span class="type-name">AllButFirst</span> a) <span class="keyword">given</span> {a} [<span class="type-name">Eq</span> a]
+  (<span class="symbol">==</span>) <span class="symbol">=</span> <span class="symbol">\</span>(<span class="type-name">MkAllButFirst</span> x) (<span class="type-name">MkAllButFirst</span> y)<span class="symbol">.</span> x <span class="symbol">==</span> y
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><h4>Test AllButFirst</h4>
+</div></div><div class="cell"><div class="code-block">all <span class="symbol">$</span> <span class="keyword">for</span> i<span class="symbol">:</span>(<span class="type-name">AllButFirst</span> (<span class="type-name">Unit</span> <span class="symbol">|</span> <span class="type-name">Fin</span> 2))<span class="symbol">.</span>
+  i <span class="symbol">==</span> (unsafe_from_ordinal _ <span class="symbol">$</span> ordinal i)
+</div><div class="result-block">True</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block">all <span class="symbol">$</span> <span class="keyword">for</span> i<span class="symbol">:</span>(<span class="type-name">AllButFirst</span> (<span class="type-name">Bool</span> <span class="symbol">|</span> <span class="type-name">Bool</span>))<span class="symbol">.</span>
+  <span class="type-name">Just</span> i <span class="symbol">==</span> (project _ <span class="symbol">$</span> inject (<span class="type-name">Bool</span> <span class="symbol">|</span> <span class="type-name">Bool</span>) i)
+</div><div class="result-block">True</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block">all <span class="symbol">$</span> <span class="keyword">for</span> i<span class="symbol">:</span>(<span class="type-name">AllButFirst</span> (<span class="type-name">Bool</span> <span class="symbol">|</span> <span class="type-name">Bool</span>))<span class="symbol">.</span>
+  i <span class="symbol">==</span> (unsafe_project _ <span class="symbol">$</span> inject (<span class="type-name">Bool</span> <span class="symbol">|</span> <span class="type-name">Bool</span>) i)
+</div><div class="result-block">True</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">for</span> i<span class="symbol">:</span>(<span class="type-name">AllButFirst</span> (<span class="type-name">Bool</span> <span class="symbol">|</span> <span class="type-name">Bool</span>))<span class="symbol">.</span>
+  inject (<span class="type-name">Bool</span> <span class="symbol">|</span> <span class="type-name">Bool</span>) i
+</div><div class="result-block">[(Left True), (Right False), (Right True)]@(AllButFirst (Bool | Bool))</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block">project (<span class="type-name">AllButFirst</span> (<span class="type-name">Bool</span> <span class="symbol">|</span> <span class="type-name">Bool</span>)) (0<span class="symbol">@</span>(<span class="type-name">Bool</span> <span class="symbol">|</span> <span class="type-name">Bool</span>))
+</div><div class="result-block">Nothing</div></div><div class="cell"><div class="code-block">
+
+</div></div><div class="cell"><div class="prose-block"><h3>Helper functions</h3>
+</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> interleave_blanks {m v} (blank<span class="command">:v</span>) (seq<span class="symbol">:</span> m<span class="symbol">=&gt;</span>v) <span class="symbol">:</span> ((<span class="type-name">FenceAndPosts</span> m)<span class="symbol">=&gt;</span>v) <span class="symbol">=</span>
+  <span class="comment">-- Turns &quot;text&quot; into &quot; t e x t &quot;.
+</span>  <span class="keyword">for</span> idx<span class="symbol">.</span> <span class="keyword">case</span> idx <span class="keyword">of</span>
+    <span class="type-name">Fence</span> i <span class="symbol">-&gt;</span> seq<span class="symbol">.</span>i
+    <span class="type-name">Posts</span> i <span class="symbol">-&gt;</span> blank
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> normalize {n v} [<span class="type-name">Fractional</span> v<span class="symbol">,</span> <span class="type-name">Add</span> v] (xs<span class="command">:n</span><span class="symbol">=&gt;</span>v) <span class="symbol">:</span> n<span class="symbol">=&gt;</span>v <span class="symbol">=</span>
+  total <span class="symbol">=</span> sum xs
+  <span class="keyword">for</span> i<span class="symbol">.</span> divide xs<span class="symbol">.</span>i total
+</div></div><div class="cell"><div class="code-block">
+
+</div></div><div class="cell"><div class="prose-block"><h3>Main CTC algorithm</h3>
+<p>Computes <code>p(labels | logits)</code>, marginalizing over possible alignments,
+and over insertion of blanks between characters.
+Todo: add a <code>[Subset position time]</code> constraint.</p>
+</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> ctc_non_empty {vocab time position}
+  [<span class="type-name">NonEmpty</span> vocab<span class="symbol">,</span> <span class="type-name">NonEmpty</span> position<span class="symbol">,</span> <span class="type-name">NonEmpty</span> time<span class="symbol">,</span> <span class="type-name">Eq</span> time<span class="symbol">,</span> <span class="type-name">Eq</span> vocab]
+    (blank<span class="symbol">:</span> vocab)
+    (logits<span class="symbol">:</span> time<span class="symbol">=&gt;</span>vocab<span class="symbol">=&gt;</span><span class="type-name">LogSpace</span> <span class="type-name">Float</span>)
+    (labels<span class="symbol">:</span> position<span class="symbol">=&gt;</span>vocab)
+      <span class="symbol">:</span> <span class="type-name">LogSpace</span> <span class="type-name">Float</span> <span class="symbol">=</span>
+  ilabels <span class="symbol">=</span> interleave_blanks blank labels
+  label_probs <span class="symbol">=</span> <span class="keyword">for</span> t<span class="symbol">.</span> normalize logits<span class="symbol">.</span>t
+
+  <span class="comment">-- Initialize dynamic programming table to all zeros
+</span>  <span class="comment">-- except for starting with either a blank or the first token.
+</span>  prob_seq_at_start <span class="symbol">=</span> yield_state zero <span class="symbol">\</span>lpRef<span class="symbol">.</span>
+    lpRef<span class="symbol">!</span>(<span class="type-name">Posts</span> first_ix) <span class="symbol">:=</span> label_probs<span class="symbol">.</span>first_ix<span class="symbol">.</span>blank
+    lpRef<span class="symbol">!</span>(<span class="type-name">Fence</span> first_ix) <span class="symbol">:=</span> label_probs<span class="symbol">.</span>first_ix<span class="symbol">.</span>(labels<span class="symbol">.</span>first_ix)
+
+  safe_idx_sub <span class="symbol">=</span> <span class="symbol">\</span>prev s y<span class="symbol">.</span>
+    <span class="keyword">if</span> (ordinal s) <span class="symbol">&lt;</span> y
+      <span class="keyword">then</span> zero
+      <span class="keyword">else</span> prev<span class="symbol">.</span>(unsafe_from_ordinal _ (unsafe_nat_diff (ordinal s) y))
+
+  same_token_as_last <span class="symbol">=</span> <span class="symbol">\</span>s<span class="symbol">.</span> <span class="keyword">if</span> (ordinal s) <span class="symbol">&gt;=</span> 2
+    <span class="keyword">then</span>
+      s_minus_2 <span class="symbol">=</span> unsafe_from_ordinal _ (unsafe_nat_diff (ordinal s) 2)
+      ilabels<span class="symbol">.</span>s <span class="symbol">==</span> ilabels<span class="symbol">.</span>s_minus_2
+    <span class="keyword">else</span> <span class="type-name">False</span>
+
+  prob_seq_final <span class="symbol">=</span> fold prob_seq_at_start <span class="symbol">\</span>t<span class="symbol">:</span>(<span class="type-name">AllButFirst</span> time) prev<span class="symbol">.</span>
+    <span class="keyword">for</span> s<span class="symbol">.</span>
+      prob_no_transition              <span class="symbol">=</span> prev<span class="symbol">.</span>s
+      prob_transition_from_blank      <span class="symbol">=</span> safe_idx_sub prev s 1
+      prob_transition_from_last_token <span class="symbol">=</span> safe_idx_sub prev s 2
+
+      <span class="comment">-- Equation 6 from CTC paper.
+</span>      transition_prob <span class="symbol">=</span> <span class="keyword">if</span> ilabels<span class="symbol">.</span>s <span class="symbol">==</span> blank <span class="symbol">||</span> same_token_as_last s
+        <span class="keyword">then</span> prob_no_transition <span class="symbol">+</span> prob_transition_from_blank
+        <span class="keyword">else</span> prob_no_transition <span class="symbol">+</span> prob_transition_from_blank <span class="symbol">+</span>
+          prob_transition_from_last_token
+      transition_prob <span class="symbol">*</span> label_probs<span class="symbol">.</span>(inject _ t)<span class="symbol">.</span>(ilabels<span class="symbol">.</span>s)
+
+  <span class="comment">-- Sum over last two entries in the table.  Eq 8 from paper.
+</span>  end_with_label <span class="symbol">=</span> prob_seq_final<span class="symbol">.</span>(<span class="type-name">Fence</span> last_ix)
+  end_with_space <span class="symbol">=</span> prob_seq_final<span class="symbol">.</span>(<span class="type-name">Posts</span> last_ix)
+  end_with_label <span class="symbol">+</span> end_with_space
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><h3>Wrapper function to provide proof of <code>NonEmpty</code></h3>
+<p>This is a wrapper function to check if any of the inputs are empty,
+and if not, casts them to an equivalent but provably <code>NonEmpty</code> form.</p>
+</div></div><div class="cell"><div class="prose-block"><p>If the compiler could generate <code>NonEmpty</code> instances for all
+<code>Fin N</code> where <code>N &gt; 0</code>, this function would be unnecessary.</p>
+</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> ctc {vocab time position} [<span class="type-name">Eq</span> time<span class="symbol">,</span> <span class="type-name">Eq</span> vocab]
+    (blank<span class="symbol">:</span> vocab)
+    (logits<span class="symbol">:</span> time<span class="symbol">=&gt;</span>vocab<span class="symbol">=&gt;</span><span class="type-name">LogSpace</span> <span class="type-name">Float</span>)
+    (labels<span class="symbol">:</span> position<span class="symbol">=&gt;</span>vocab)
+      <span class="symbol">:</span> <span class="type-name">LogSpace</span> <span class="type-name">Float</span> <span class="symbol">=</span>
+  <span class="keyword">if</span> ((size vocab) <span class="symbol">&gt;</span> 0) <span class="symbol">&amp;&amp;</span> ((size time) <span class="symbol">&gt;</span> 0) <span class="symbol">&amp;&amp;</span> ((size position) <span class="symbol">&gt;</span> 0)
+    <span class="keyword">then</span>
+      vocab_size_m1    <span class="symbol">=</span> unsafe_nat_diff (size vocab) 1
+      time_size_m1     <span class="symbol">=</span> unsafe_nat_diff (size time) 1
+      position_size_m1 <span class="symbol">=</span> unsafe_nat_diff (size position) 1
+
+      vocab&#39;    <span class="symbol">=</span> (<span class="type-name">Unit</span> <span class="symbol">|</span> <span class="type-name">Fin</span> vocab_size_m1)
+      time&#39;     <span class="symbol">=</span> (<span class="type-name">Unit</span> <span class="symbol">|</span> <span class="type-name">Fin</span> time_size_m1)
+      position&#39; <span class="symbol">=</span> (<span class="type-name">Unit</span> <span class="symbol">|</span> <span class="type-name">Fin</span> position_size_m1)
+
+      blank&#39;  <span class="symbol">=</span> unsafe_from_ordinal vocab&#39; (ordinal blank)
+      logits&#39; <span class="symbol">=</span> <span class="keyword">view</span> t<span class="command">:time</span>&#39; v<span class="command">:vocab</span>&#39;<span class="symbol">.</span>
+        logits<span class="symbol">.</span>(unsafe_from_ordinal _ (ordinal t))<span class="symbol">.</span>(unsafe_from_ordinal _ (ordinal v))
+      labels&#39; <span class="symbol">=</span> <span class="keyword">view</span> p<span class="command">:position</span>&#39;<span class="symbol">.</span>
+        unsafe_from_ordinal _ (ordinal labels<span class="symbol">.</span>(unsafe_from_ordinal _ (ordinal p)))
+
+      ctc_non_empty blank&#39; logits&#39; labels&#39;
+    <span class="keyword">else</span> zero
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><h2>Demo</h2>
+<p>Evaluate marginal probability of some labels given logits.</p>
+</div></div><div class="cell"><div class="code-block"><span class="type-name">Vocab</span> <span class="symbol">=</span> <span class="type-name">Fin</span> 6
+</div></div><div class="cell"><div class="code-block">blank <span class="symbol">=</span> 0<span class="symbol">@</span><span class="type-name">Vocab</span>
+</div></div><div class="cell"><div class="code-block"><span class="type-name">Time</span> <span class="symbol">=</span> <span class="type-name">Fin</span> 4
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="comment">-- Create random logits and labels
+</span></div></div><div class="cell"><div class="code-block">logits <span class="symbol">:</span> <span class="type-name">Time</span> <span class="symbol">=&gt;</span> <span class="type-name">Vocab</span> <span class="symbol">=&gt;</span> (<span class="type-name">LogSpace</span> <span class="type-name">Float</span>) <span class="symbol">=</span> arb <span class="symbol">$</span> new_key 0
+</div></div><div class="cell"><div class="code-block">labels <span class="symbol">=</span> [(3<span class="symbol">@</span><span class="type-name">Vocab</span>)<span class="symbol">,</span> (4<span class="symbol">@</span><span class="type-name">Vocab</span>)<span class="symbol">,</span> (1<span class="symbol">@</span><span class="type-name">Vocab</span>)]
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="comment">-- Evaluate probability.
+</span></div></div><div class="cell"><div class="code-block"><span class="command">:p</span> ls_to_f <span class="symbol">$</span> ctc blank logits labels
+</div><div class="result-block">0.00209</div></div><div class="cell"><div class="code-block">
+
+</div></div><div class="cell"><div class="prose-block"><h3>Test</h3>
+<p>The CTC paper claims that the output of the above algorithm
+computes <code>p(labels|logits)</code>, which should sum to 1.0 over all possible labels.
+They don't sum to one.  Maybe there is a bug in the above code
+or the paper.</p>
+</div></div><div class="cell"><div class="code-block"><span class="comment">-- Fin N=&gt;Vocab is the set of all combinations of N tokens.
+</span></div></div><div class="cell"><div class="code-block">sum <span class="keyword">for</span> i<span class="symbol">:</span>(<span class="type-name">Fin</span> 3<span class="symbol">=&gt;</span><span class="type-name">Vocab</span>)<span class="symbol">.</span>
+  ls_to_f <span class="symbol">$</span> ctc blank logits i
+</div><div class="result-block">0.565375</div></div></div></body></html>

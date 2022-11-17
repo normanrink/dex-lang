@@ -1,0 +1,564 @@
+<!DOCTYPE HTML>
+<html><head><meta charset="UTF-8"><style type="text/css">/* Copyright 2019 Google LLC                              */
+/*                                                        */
+/* Use of this source code is governed by a BSD-style     */
+/* license that can be found in the LICENSE file or at    */
+/* https://developers.google.com/open-source/licenses/bsd */
+
+body {
+  font-family: Helvetica, sans-serif;
+  font-size: 100%;
+  color: #333;
+  display: flex;
+  justify-content: space-between;
+  overflow-x: hidden;
+
+  --main-width: 50rem;
+  --nav-width: 20rem;
+}
+
+@media (max-width: 70rem) {
+    /*For narrow screens hide nav and enable horizontal scrolling */
+    nav {display: none;}
+    body {overflow-x: auto;}
+}
+
+nav {/* this actually just holds space for #navbar, which is fixed */
+  min-width: var(--nav-width);
+  max-width: var(--nav-width);
+}
+#navbar {
+  position: fixed;
+  height: 100vh;
+  width: var(--nav-width);
+  overflow-y: scroll;
+  border-right: 1px solid firebrick;
+}
+#navbar:before {
+  content: "Contents";
+  font-weight: bold;
+}
+nav ol {
+  list-style-type:none;
+  padding-left: 1rem;
+}
+
+#main-output {
+  max-width: var(--main-width);
+  margin: auto;
+}
+
+.cell {
+}
+
+.code-block, .err-block, .result-block {
+  padding: 0em 0em 0em 2em;
+  display: block;
+  font-family: monospace;
+  white-space: pre;
+}
+
+code {
+  background-color: #F0F0F0;
+}
+
+.result-block {
+  border-left: 3px solid  #87CEFA;
+}
+
+.prose-block {
+  line-height: 140%;
+}
+
+.err-block {
+  font-weight: bold;
+  color: #B22222;
+  border-left: 3px solid #B22222;
+}
+
+.plot {
+  padding: 5em;
+}
+
+.plot-img {
+  width: 80%;
+}
+
+.comment {
+  color: #808080;
+}
+
+.keyword {
+  color: #0000DD;
+}
+
+.command {
+  color: #A80000;
+}
+
+.symbol {
+  color: #E07000;
+}
+
+.type-name {
+  color: #A80000;
+}
+
+.iso-sugar {
+  color: #25BBA7;
+}
+</style><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css"><script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.js"></script><script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/contrib/auto-render.min.js" onload="// Copyright 2019 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
+var katexOptions = {
+    delimiters: [
+        {left: &quot;$$&quot;, right: &quot;$$&quot;, display: true},
+        {left: &quot;\\[&quot;, right: &quot;\\]&quot;, display: true},
+        {left: &quot;$&quot;, right: &quot;$&quot;, display: false},
+        {left: &quot;\\(&quot;, right: &quot;\\)&quot;, display: false}
+    ],
+    // Enable commands that load resources or change HTML attributes
+    // (e.g. hyperlinks): https://katex.org/docs/security.html.
+    trust: true
+};
+
+var cells = {};
+
+function append_contents(key, contents) {
+    if (key in cells) {
+        var cur_cells = cells[key];
+    } else {
+        var cell = document.createElement(&quot;div&quot;);
+        cell.className = &quot;cell&quot;;
+        cells[key] = [cell];
+        var cur_cells = [cell];
+    }
+    for (var i = 0; i &lt; contents.length; i++) {
+        for (var j = 0; j &lt; cur_cells.length; j++) {
+            var node = lookup_address(cur_cells[j], contents[i][0])
+            node.innerHTML += contents[i][1];
+        }
+    }
+}
+
+function lookup_address(cell, address) {
+    var node = cell
+    for (i = 0; i &lt; address.length; i++) {
+        node = node.children[address[i]]
+    }
+    return node
+}
+
+function renderLaTeX() {
+    // Render LaTeX equations in prose blocks via KaTeX, if available.
+    // Skip rendering if KaTeX is unavailable.
+    if (typeof renderMathInElement == &#39;undefined&#39;) {
+        return;
+    }
+    // Render LaTeX equations in prose blocks via KaTeX.
+    var proseBlocks = document.querySelectorAll(&quot;.prose-block&quot;);
+    Array.from(proseBlocks).map((proseBlock) =&gt;
+        renderMathInElement(proseBlock, katexOptions)
+    );
+}
+
+/**
+ * Rendering the Table of Contents / Navigation Bar
+ * 2 key functions
+ *  - `updateNavigation()` which inserts/updates the navigation bar
+ *  - and it&#39;s helper `extractStructure()` which extracts the structure of the page
+ *    and adds ids to heading elements.
+*/
+function updateNavigation() {
+    function navItemList(struct) {
+        var listEle = document.createElement(&#39;ol&#39;)
+        struct.children.forEach(childStruct=&gt;
+            listEle.appendChild(navItem(childStruct))
+        );
+        return listEle;
+    }
+    function navItem(struct) {
+        var a = document.createElement(&#39;a&#39;);
+        a.appendChild(document.createTextNode(struct.text));
+        a.title = struct.text;
+        a.href = &quot;#&quot;+struct.id;
+
+        var ele = document.createElement(&#39;li&#39;)
+        ele.appendChild(a)
+        ele.appendChild(navItemList(struct));
+        return ele;
+    }
+
+    var navbarEle = document.getElementById(&quot;navbar&quot;)
+    if (navbarEle === null) {  // create it
+        navbarEle = document.createElement(&quot;div&quot;);
+        navbarEle.id=&quot;navbar&quot;;
+        navOuterEle = document.createElement(&quot;nav&quot;)
+        navOuterEle.appendChild(navbarEle);
+        document.body.prepend(navOuterEle);
+    }
+
+    navbarEle.innerHTML = &quot;&quot;
+    var structure = extractStructure()
+    navbarEle.appendChild(navItemList(structure));
+}
+
+function extractStructure() { // Also sets ids on h1,h2,...
+    var headingsNodes = document.querySelectorAll(&quot;h1, h2, h3, h4, h5, h6&quot;);
+    // For now we are just fulling going to regenerate the structure each time
+    // Might be better if we made minimal changes, but 🤷
+
+    // Extract the structure of the document
+    var structure = {children:[]}
+    var active = [structure.children];
+    headingsNodes.forEach(
+        function(currentValue, currentIndex) {
+            currentValue.id = &quot;s-&quot; + currentIndex;
+            var currentLevel = parseInt(currentValue.nodeName[1]);
+
+            // Insert dummy levels up for any levels that are skipped
+            for (var i=active.length; i &lt; currentLevel; i++) {
+                var dummy = {id: &quot;&quot;, text: &quot;&quot;, children: []}
+                active.push(dummy.children);
+                var parentList = active[i-1]
+                parentList.push(dummy);
+            }
+            // delete this level and everything after
+            active.splice(currentLevel, active.length);
+
+            var currentStructure = {
+                id: currentValue.id,
+                text: currentValue.textContent,
+                children: [],
+            };
+            active.push(currentStructure.children);
+
+            var parentList = active[active.length-2]
+            parentList.push(currentStructure);
+        },
+    );
+    return structure;
+}
+
+/**
+ * HTML rendering mode.
+ * Static rendering is used for static HTML pages.
+ * Dynamic rendering is used for dynamic HTML pages via `dex web`.
+ *
+ * @enum {string}
+ */
+var RENDER_MODE = Object.freeze({
+  STATIC: &quot;static&quot;,
+  DYNAMIC: &quot;dynamic&quot;,
+})
+
+/**
+ * Renders the webpage.
+ * @param {RENDER_MODE} renderMode The render mode, either static or dynamic.
+ */
+function render(renderMode) {
+    if (renderMode == RENDER_MODE.STATIC) {
+        // For static pages, simply call rendering functions once.
+        renderLaTeX();
+        updateNavigation();
+    } else {
+        // For dynamic pages (via `dex web`), listen to update events.
+        var source = new EventSource(&quot;/getnext&quot;);
+        source.onmessage = function(event) {
+            var body = document.getElementById(&quot;main-output&quot;);
+            var msg = JSON.parse(event.data);
+            if (msg == &quot;start&quot;) {
+                body.innerHTML = &quot;&quot;;
+                cells = {}
+                return
+            }
+            var order    = msg[0];
+            var contents = msg[1];
+            for (var i = 0; i &lt; contents.length; i++) {
+                append_contents(contents[i][0], contents[i][1]);
+            }
+            if (order != null) {
+                var new_cells = {};
+                body.innerHTML = &quot;&quot;;
+                for (var i = 0; i &lt; order.val.length; i++) {
+                    var key = order.val[i]
+                    var cur_cells = cells[key]
+                    if (cur_cells.length == 0) {
+                        var cur_cell = new_cells[key][0].cloneNode(true)
+                    } else {
+                        var cur_cell = cur_cells.pop()
+                        if (key in new_cells) {
+                            new_cells[key].push(cur_cell);
+                        } else {
+                            new_cells[key] = [cur_cell];
+                        }
+                    }
+                    body.appendChild(cur_cell);
+                }
+                Object.assign(cells, new_cells);
+            }
+            renderLaTeX();
+            updateNavigation();
+        };
+    }
+}
+render(RENDER_MODE.STATIC);"></script></head><body><div id="main-output"><div class="cell"><div class="code-block"></div></div><div class="cell"><div class="prose-block"><h1>Isomorphisms in Dex</h1>
+</div></div><div class="cell"><div class="prose-block"><p><code>Iso a b</code> is the type of an isomorphism between <code>a</code> and <code>b</code>.</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:t</span> <span class="type-name">MkIso</span>
+</div><div class="result-block">((a:Type) ?-&gt; (b:Type) ?-&gt; {bwd: b -&gt; a &amp; fwd: a -&gt; b} -&gt; Iso a b)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p>This is a normal ADT, and you can construct your own isomorphisms.</p>
+</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> cycle_three {a b c} <span class="symbol">:</span> <span class="type-name">Iso</span> (a <span class="symbol">&amp;</span> b <span class="symbol">&amp;</span> c) (b <span class="symbol">&amp;</span> c <span class="symbol">&amp;</span> a) <span class="symbol">=</span>
+  <span class="type-name">MkIso</span> {
+      fwd <span class="symbol">=</span> <span class="symbol">\</span>(a<span class="symbol">,</span> b<span class="symbol">,</span> c)<span class="symbol">.</span> (b<span class="symbol">,</span> c<span class="symbol">,</span> a)
+    <span class="symbol">,</span> bwd <span class="symbol">=</span> <span class="symbol">\</span>(b<span class="symbol">,</span> c<span class="symbol">,</span> a)<span class="symbol">.</span> (a<span class="symbol">,</span> b<span class="symbol">,</span> c)
+    }
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p>Isomorphisms can be applied with <code>app_iso</code>, applied in reverse with <code>rev_iso</code>,
+and flipped with <code>flip_iso</code></p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> app_iso cycle_three (1<span class="symbol">,</span> 2<span class="symbol">.</span>0<span class="symbol">,</span> 3)
+</div><div class="result-block">(2., (3, 1))</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> rev_iso cycle_three (1<span class="symbol">,</span> 2<span class="symbol">.</span>0<span class="symbol">,</span> 3)
+</div><div class="result-block">(3, (1, 2.))</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> app_iso (flip_iso cycle_three) (1<span class="symbol">,</span> 2<span class="symbol">.</span>0<span class="symbol">,</span> 3)
+</div><div class="result-block">(3, (1, 2.))</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p>They can also be composed with <code>&amp;&gt;&gt;</code>:</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> app_iso (cycle_three <span class="symbol">&amp;&gt;&gt;</span> cycle_three) (1<span class="symbol">,</span> 2<span class="symbol">.</span>0<span class="symbol">,</span> 3)
+</div><div class="result-block">(3, (1, 2.))</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> app_iso (cycle_three <span class="symbol">&amp;&gt;&gt;</span> cycle_three <span class="symbol">&amp;&gt;&gt;</span> cycle_three) (1<span class="symbol">,</span> 2<span class="symbol">.</span>0<span class="symbol">,</span> 3)
+</div><div class="result-block">(1, (2., 3))</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p>Note that we assume but do not check that the isomorphism is lawful (i.e.
+<code>app_iso iso $ rev_iso iso x == x</code> for all <code>x</code>, or equivalently
+<code>iso &amp;&gt;&gt; (flip_iso iso) == id_iso</code>).</p>
+</div></div><div class="cell"><div class="prose-block"><p>In addition, Dex will automatically write some useful isomorphisms for you
+to extract fields from records and variants. There are four syntactic forms
+that produce isos. We will start with the first two:</p>
+<ul>
+<li><code>#x</code> produces a &quot;lens-like&quot; record accessor <code>Iso {x:a &amp; ...r} (a &amp; {&amp;...r})</code></li>
+<li><code>#?x</code> produces a &quot;prism-like&quot; variant matcher <code>Iso {x:a | ...r} (a | {|...r})</code></li>
+</ul>
+</div></div><div class="cell"><div class="code-block">%passes parse
+<span class="command">:t</span> <span class="iso-sugar">#b</span> <span class="symbol">::</span> <span class="type-name">Iso</span> {a<span class="symbol">:</span><span class="type-name">Int</span> <span class="symbol">&amp;</span> b<span class="symbol">:</span><span class="type-name">Float</span> <span class="symbol">&amp;</span> c<span class="symbol">:</span><span class="type-name">Unit</span>} _
+</div><div class="result-block">(Iso {a: Int32 &amp; b: Float32 &amp; c: Unit} (Float32 &amp; {a: Int32 &amp; c: Unit}))</div><div class="result-block">(MkIso {fwd=(\{b=x, ...r}. (,) x r), bwd=(\(x, r). {b=x, ...r})}
+ : Iso {a: Int &amp; b: Float &amp; c: Unit} _)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block">%passes parse
+<span class="command">:t</span> <span class="iso-sugar">#?b</span> <span class="symbol">::</span> <span class="type-name">Iso</span> {a<span class="symbol">:</span><span class="type-name">Int</span> <span class="symbol">|</span> b<span class="symbol">:</span><span class="type-name">Float</span> <span class="symbol">|</span> c<span class="symbol">:</span><span class="type-name">Unit</span>} _
+</div><div class="result-block">(Iso {a: Int32 | b: Float32 | c: Unit} (Float32 | {a: Int32 | c: Unit}))</div><div class="result-block">(MkIso
+   {fwd=(\v. case v
+             {| b = x |} -&gt; (Left x)
+             {|b| ...r |} -&gt; (Right r))
+   , bwd=(\v. case v
+              ((Left x)) -&gt; {| b = x |}
+              ((Right r)) -&gt; {|b| ...r |})}
+ : Iso {a: Int | b: Float | c: Unit} _)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p>There are also two &quot;zipper&quot; forms, described later on this page:</p>
+<ul>
+<li><code>#&amp;x</code> produces a &quot;record-zipper&quot; isomorphism
+<pre><code>Iso ({&amp;...l} &amp; {x:a &amp; ...r}) ({x:a &amp; ...l} &amp; {&amp;...r})
+</code></pre>
+</li>
+<li><code>#|x</code> produces a &quot;variant-zipper&quot; isomorphism
+<pre><code>Iso ({|...l} | {x:a | ...r}) ({x:a | ...l} | {|...r})
+</code></pre>
+</li>
+</ul>
+</div></div><div class="cell"><div class="prose-block"><h2>Record accessors and lens-like helpers</h2>
+<p>Record accessor isomorphisms can be passed into the helper function <code>get_at</code>:</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:t</span> get_at
+</div><div class="result-block">((a:Type) ?-&gt; (b:Type) ?-&gt; (c:Type) ?-&gt; (Iso a (b &amp; c)) -&gt; a -&gt; b)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> get_at <span class="iso-sugar">#foo</span> {foo<span class="symbol">=</span>1<span class="symbol">,</span> bar<span class="symbol">=</span>2<span class="symbol">.</span>0}
+</div><div class="result-block">1</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p>We can also do other types of things:</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> pop_at <span class="iso-sugar">#foo</span> {foo<span class="symbol">=</span>1<span class="symbol">,</span> bar<span class="symbol">=</span>2<span class="symbol">.</span>0}
+</div><div class="result-block">{bar = 2.}</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> push_at <span class="iso-sugar">#foo</span> 3<span class="symbol">.</span>0 {foo<span class="symbol">=</span>1<span class="symbol">,</span> bar<span class="symbol">=</span>2<span class="symbol">.</span>0}
+</div><div class="result-block">{bar = 2., foo = 3., foo = 1}</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> set_at <span class="iso-sugar">#foo</span> 2 {foo<span class="symbol">=</span>1<span class="symbol">,</span> bar<span class="symbol">=</span>2<span class="symbol">.</span>0}
+</div><div class="result-block">{bar = 2., foo = 2}</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p>These helper functions work with any &quot;lens-like&quot; isomorphism. For instance,
+we can select everything except for a particular field:</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:t</span> except_lens
+</div><div class="result-block">((a:Type) ?-&gt; (b:Type) ?-&gt; (c:Type) ?-&gt; (Iso a (b &amp; c)) -&gt; Iso a (c &amp; b))</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> get_at (except_lens <span class="iso-sugar">#foo</span>) {foo<span class="symbol">=</span>1<span class="symbol">,</span> bar<span class="symbol">=</span>2<span class="symbol">.</span>0<span class="symbol">,</span> baz<span class="symbol">=</span>3}
+</div><div class="result-block">{bar = 2., baz = 3}</div></div><div class="cell"><div class="code-block">
+
+</div></div><div class="cell"><div class="prose-block"><h2>Variant accessors and prism-like helpers</h2>
+<p>Similarly, there are prism-like helpers</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:t</span> match_with
+</div><div class="result-block">((a:Type) ?-&gt; (b:Type) ?-&gt; (c:Type) ?-&gt; (Iso a (b | c)) -&gt; a -&gt; Maybe b)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:t</span> build_with
+</div><div class="result-block">((a:Type) ?-&gt; (b:Type) ?-&gt; (c:Type) ?-&gt; (Iso a (b | c)) -&gt; b -&gt; a)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p>which can be used with variant accessors or any other prism-like isomorphism:</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> match_with <span class="iso-sugar">#?foo</span> <span class="symbol">$</span> {<span class="symbol">|</span>foo <span class="symbol">=</span> 1<span class="symbol">|</span>}<span class="symbol">::</span>{foo<span class="symbol">:</span><span class="type-name">Int</span> <span class="symbol">|</span> bar<span class="symbol">:</span><span class="type-name">Float</span>}
+</div><div class="result-block">(Just 1)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> match_with <span class="iso-sugar">#?foo</span> <span class="symbol">$</span> {<span class="symbol">|</span>bar <span class="symbol">=</span> 1<span class="symbol">.</span>0<span class="symbol">|</span>}<span class="symbol">::</span>{foo<span class="symbol">:</span><span class="type-name">Int</span> <span class="symbol">|</span> bar<span class="symbol">:</span><span class="type-name">Float</span>}
+</div><div class="result-block">Nothing</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> build_with <span class="iso-sugar">#?foo</span> 3 <span class="symbol">::</span> {foo<span class="symbol">:</span><span class="type-name">Int</span> <span class="symbol">|</span> bar<span class="symbol">:</span><span class="type-name">Float</span>}
+</div><div class="result-block">{| foo = 3 |}</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> match_with (except_prism <span class="iso-sugar">#?foo</span>) <span class="symbol">$</span>  {<span class="symbol">|</span>bar <span class="symbol">=</span> 1<span class="symbol">.</span>0<span class="symbol">|</span>}<span class="symbol">::</span>{foo<span class="symbol">:</span><span class="type-name">Int</span> <span class="symbol">|</span> bar<span class="symbol">:</span><span class="type-name">Float</span>}
+</div><div class="result-block">(Just {| bar = 1. |})</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><h2>Record zipper isomorphisms</h2>
+<p>The isomorphisms shown above are specialized for removing a single field from
+an object. As such, they don't compose well when trying to work with more than
+one field at a time. When using multiple fields, a better choice is to use
+a &quot;zipper isomorphism&quot;, which moves a subset of fields from one place to
+another. For instance:</p>
+</div></div><div class="cell"><div class="code-block">%passes parse
+<span class="command">:t</span> <span class="iso-sugar">#&amp;a</span> <span class="symbol">::</span> <span class="type-name">Iso</span> ({<span class="symbol">&amp;</span>} <span class="symbol">&amp;</span> {a<span class="symbol">:</span><span class="type-name">Int</span> <span class="symbol">&amp;</span> b<span class="symbol">:</span><span class="type-name">Float</span> <span class="symbol">&amp;</span> c<span class="symbol">:</span><span class="type-name">Unit</span>}) _
+</div><div class="result-block">(Iso
+   ({&amp;} &amp; {a: Int32 &amp; b: Float32 &amp; c: Unit})
+   ({a: Int32} &amp; {b: Float32 &amp; c: Unit}))</div><div class="result-block">(MkIso
+   {fwd=(\({...l}, {a=x, ...r}). (,) {a=x, ...l} {...r})
+   , bwd=(\({a=x, ...l}, {...r}). (,) {...l} {a=x, ...r})}
+ : Iso ((&amp;) {} {a: Int &amp; b: Float &amp; c: Unit}) _)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:t</span> (<span class="iso-sugar">#&amp;a</span> <span class="symbol">&amp;&gt;&gt;</span> <span class="iso-sugar">#&amp;b</span>) <span class="symbol">::</span> <span class="type-name">Iso</span> ({<span class="symbol">&amp;</span>} <span class="symbol">&amp;</span> {a<span class="symbol">:</span><span class="type-name">Int</span> <span class="symbol">&amp;</span> b<span class="symbol">:</span><span class="type-name">Float</span> <span class="symbol">&amp;</span> c<span class="symbol">:</span><span class="type-name">Unit</span>}) _
+</div><div class="result-block">(Iso
+   ({&amp;} &amp; {a: Int32 &amp; b: Float32 &amp; c: Unit})
+   ({a: Int32 &amp; b: Float32} &amp; {c: Unit}))</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p><code>#&amp;a</code> and <code>#&amp;b</code> are isomorphisms that move a given field from the record on the
+right to the record on the left; when composed, they move both fields.</p>
+</div></div><div class="cell"><div class="prose-block"><p>The main use for record zipper isomorphisms is to specify multiple named axes
+when using a record type as an index set:</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:t</span> over_fields
+</div><div class="result-block">((a:Type)
+ ?-&gt; (b:Type)
+ ?-&gt; (c:Type)
+ ?-&gt; (v:Type)
+ ?-&gt; (v#0:(Ix b))
+ ?=&gt; (v#1:(Ix c))
+ ?=&gt; (Iso ({&amp;} &amp; a) (b &amp; c)) -&gt; (_autoq:(Ix a)) ?=&gt; (a =&gt; v) -&gt; b =&gt; c =&gt; v)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="comment">-- :p
+</span></div></div><div class="cell"><div class="code-block"><span class="comment">--   x = for {a, b, c}:{a:Fin 2 &amp; b:Fin 2 &amp; c:Fin 2}.
+</span></div></div><div class="cell"><div class="code-block"><span class="comment">--     ordinal a * 100 + ordinal b * 10 + ordinal c
+</span></div></div><div class="cell"><div class="code-block"><span class="comment">--   v1 = x
+</span></div></div><div class="cell"><div class="code-block"><span class="comment">--   v2 = sum $ over_fields (#&amp;b) x
+</span></div></div><div class="cell"><div class="code-block"><span class="comment">--   v3 = sum $ over_fields (#&amp;b &amp;&gt;&gt; #&amp;c) x
+</span></div></div><div class="cell"><div class="code-block"><span class="comment">--   v4 = sum $ over_fields (#&amp;a &amp;&gt;&gt; #&amp;b &amp;&gt;&gt; #&amp;c) x
+</span></div></div><div class="cell"><div class="code-block"><span class="comment">--   (v1, v2, v3, v4)
+</span></div></div><div class="cell"><div class="code-block"><span class="comment">-- &gt; ( [0, 100, 10, 110, 1, 101, 11, 111]@{a: Fin 2 &amp; b: Fin 2 &amp; c: Fin 2}
+</span></div></div><div class="cell"><div class="code-block"><span class="comment">-- &gt; , ([10, 210, 12, 212]@{a: Fin 2 &amp; c: Fin 2}, ([22, 422]@{a: Fin 2}, [444]@{ &amp;})) )
+</span></div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p>Note that <code>over_fields</code> is just a simple wrapper combining <code>split_r</code> and
+<code>over_lens</code>:</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:t</span> split_r
+</div><div class="result-block">((a:Type) ?-&gt; Iso a ({&amp;} &amp; a))</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:t</span> over_lens
+</div><div class="result-block">((a:Type)
+ ?-&gt; (b:Type)
+ ?-&gt; (c:Type)
+ ?-&gt; (v:Type)
+ ?-&gt; (v#0:(Ix b))
+ ?=&gt; (v#1:(Ix c))
+ ?=&gt; (Iso a (b &amp; c)) -&gt; (_autoq:(Ix a)) ?=&gt; (a =&gt; v) -&gt; b =&gt; c =&gt; v)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p><code>over_lens</code> alone can be used with any lens-like isomorphism, for instance an
+ordinary record accessor lens.</p>
+</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> abc_to_tuple {a b c} <span class="symbol">:</span> <span class="type-name">Iso</span> {a<span class="command">:a</span> <span class="symbol">&amp;</span> b<span class="command">:b</span> <span class="symbol">&amp;</span> c<span class="command">:c</span>} (c<span class="symbol">&amp;</span>b<span class="symbol">&amp;</span>a) <span class="symbol">=</span>
+  fwd <span class="symbol">=</span> <span class="symbol">\</span>({a<span class="symbol">,</span> b<span class="symbol">,</span> c})<span class="symbol">.</span> (c<span class="symbol">,</span> b<span class="symbol">,</span> a)
+  bwd <span class="symbol">=</span> <span class="symbol">\</span>(c<span class="symbol">,</span> b<span class="symbol">,</span> a)<span class="symbol">.</span> {a<span class="symbol">,</span> b<span class="symbol">,</span> c}
+  <span class="type-name">MkIso</span> {fwd<span class="symbol">,</span> bwd}
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">Ix</span> {a<span class="command">:n</span> <span class="symbol">&amp;</span> b<span class="command">:m</span> <span class="symbol">&amp;</span> c<span class="command">:q</span>} <span class="keyword">given</span> {n m q} [<span class="type-name">Ix</span> n<span class="symbol">,</span> <span class="type-name">Ix</span> m<span class="symbol">,</span> <span class="type-name">Ix</span> q]
+  size <span class="symbol">=</span> size n <span class="symbol">*</span> size m <span class="symbol">*</span> size q
+  ordinal <span class="symbol">=</span> ordinal <span class="symbol">&lt;&lt;&lt;</span> app_iso abc_to_tuple
+  unsafe_from_ordinal <span class="symbol">=</span> unsafe_from_ordinal _ <span class="symbol">&gt;&gt;&gt;</span> rev_iso abc_to_tuple
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> bc_to_pair {b c} <span class="symbol">:</span> <span class="type-name">Iso</span> {b<span class="command">:b</span> <span class="symbol">&amp;</span> c<span class="command">:c</span>} (c<span class="symbol">&amp;</span>b) <span class="symbol">=</span>
+  fwd <span class="symbol">=</span> <span class="symbol">\</span>({b<span class="symbol">,</span> c})<span class="symbol">.</span> (c<span class="symbol">,</span> b)
+  bwd <span class="symbol">=</span> <span class="symbol">\</span>(c<span class="symbol">,</span> b)<span class="symbol">.</span> {b<span class="symbol">,</span> c}
+  <span class="type-name">MkIso</span> {fwd<span class="symbol">,</span> bwd}
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">Ix</span> {b<span class="command">:n</span> <span class="symbol">&amp;</span> c<span class="command">:m</span>} <span class="keyword">given</span> {n m} [<span class="type-name">Ix</span> n<span class="symbol">,</span> <span class="type-name">Ix</span> m]
+  size <span class="symbol">=</span> size n <span class="symbol">*</span> size m
+  ordinal <span class="symbol">=</span> ordinal <span class="symbol">&lt;&lt;&lt;</span> app_iso bc_to_pair
+  unsafe_from_ordinal <span class="symbol">=</span> unsafe_from_ordinal _ <span class="symbol">&gt;&gt;&gt;</span> rev_iso bc_to_pair
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span>
+  x <span class="symbol">=</span> <span class="keyword">for</span> {a<span class="symbol">,</span> b<span class="symbol">,</span> c}<span class="symbol">:</span>{a<span class="symbol">:</span><span class="type-name">Fin</span> 2 <span class="symbol">&amp;</span> b<span class="symbol">:</span><span class="type-name">Fin</span> 2 <span class="symbol">&amp;</span> c<span class="symbol">:</span><span class="type-name">Fin</span> 2}<span class="symbol">.</span>
+    ordinal a <span class="symbol">*</span> 100 <span class="symbol">+</span> ordinal b <span class="symbol">*</span> 10 <span class="symbol">+</span> ordinal c
+  over_lens <span class="iso-sugar">#a</span> x
+</div><div class="result-block">[ [0, 10, 1, 11]@{b: Fin 2 &amp; c: Fin 2}
+, [100, 110, 101, 111]@{b: Fin 2 &amp; c: Fin 2} ]</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p><code>split_r</code> can be used if you want to process multiple fields at once:</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> push_at (split_r <span class="symbol">&amp;&gt;&gt;</span> <span class="iso-sugar">#&amp;a</span> <span class="symbol">&amp;&gt;&gt;</span> <span class="iso-sugar">#&amp;b</span>) {a<span class="symbol">=</span>1<span class="symbol">,</span> b<span class="symbol">=</span>2<span class="symbol">.</span>0} {c<span class="symbol">=</span>3<span class="symbol">,</span> d<span class="symbol">=</span>4<span class="symbol">.</span>0}
+</div><div class="result-block">{a = 1, b = 2., c = 3, d = 4.}</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><h2>Variant zipper isomorphisms</h2>
+<p>Just as there are record zipper isomorphisms, there are also variant
+zipper isomorphisms:</p>
+</div></div><div class="cell"><div class="code-block">%passes parse
+<span class="command">:t</span> <span class="iso-sugar">#|a</span> <span class="symbol">::</span> <span class="type-name">Iso</span> ({<span class="symbol">|</span> } <span class="symbol">|</span> {a<span class="symbol">:</span><span class="type-name">Int</span> <span class="symbol">|</span> b<span class="symbol">:</span><span class="type-name">Float</span> <span class="symbol">|</span> c<span class="symbol">:</span><span class="type-name">Unit</span>}) _
+</div><div class="result-block">(Iso
+   ({ |} | {a: Int32 | b: Float32 | c: Unit})
+   ({a: Int32} | {b: Float32 | c: Unit}))</div><div class="result-block">(MkIso
+   {fwd=(\v. case v
+             ((Left l)) -&gt; (Left {|a| ...l |})
+             ((Right w)) -&gt; (case w
+                               {| a = x |} -&gt; (Left {| a = x |})
+                               {|a| ...r |} -&gt; (Right r)))
+   , bwd=(\v. case v
+              ((Left w)) -&gt; (case w
+                               {| a = x |} -&gt; (Right {| a = x |})
+                               {|a| ...r |} -&gt; (Left r))
+              ((Right l)) -&gt; (Right {|a| ...l |}))}
+ : Iso ((|) { |} {a: Int | b: Float | c: Unit}) _)</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p><code>split_v</code> makes a prism zipper into an ordinary prism isomorphism:</p>
+</div></div><div class="cell"><div class="code-block"><span class="command">:t</span> split_v
+</div><div class="result-block">((a:Type) ?-&gt; Iso a ({ |} | a))</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span>
+  vals <span class="symbol">:</span> (<span class="type-name">Fin</span> 3)<span class="symbol">=&gt;</span>{a<span class="symbol">:</span>_ <span class="symbol">|</span> b<span class="symbol">:</span>_ <span class="symbol">|</span> c<span class="symbol">:</span>_ } <span class="symbol">=</span> [{<span class="symbol">|</span>a <span class="symbol">=</span> 1<span class="symbol">|</span>}<span class="symbol">,</span> {<span class="symbol">|</span>b <span class="symbol">=</span> 2<span class="symbol">|</span>}<span class="symbol">,</span> {<span class="symbol">|</span>c <span class="symbol">=</span> 3<span class="symbol">|</span>}]
+  <span class="keyword">for</span> i<span class="symbol">.</span> match_with (split_v <span class="symbol">&amp;&gt;&gt;</span> <span class="iso-sugar">#|a</span> <span class="symbol">&amp;&gt;&gt;</span> <span class="iso-sugar">#|b</span>) vals<span class="symbol">.</span>i
+</div><div class="result-block">[(Just {| a = 1 |}), (Just {| b = 2 |}), Nothing]</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="prose-block"><p><code>slice_fields</code> uses this to specific named variants from a variant-indexed
+table:</p>
+</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> abc_to_either {a b c} <span class="symbol">:</span> <span class="type-name">Iso</span> {a<span class="command">:a</span> <span class="symbol">|</span> b<span class="command">:b</span> <span class="symbol">|</span> c<span class="command">:c</span>} (a<span class="symbol">|</span>(b<span class="symbol">|</span>c)) <span class="symbol">=</span>
+  fwd <span class="symbol">=</span> <span class="symbol">\</span>v<span class="symbol">.</span>  <span class="keyword">case</span> v <span class="keyword">of</span>
+    {<span class="symbol">|</span>a<span class="symbol">=</span>x<span class="symbol">|</span>} <span class="symbol">-&gt;</span> <span class="type-name">Left</span> x
+    {<span class="symbol">|</span>b<span class="symbol">=</span>x<span class="symbol">|</span>} <span class="symbol">-&gt;</span> <span class="type-name">Right</span> (<span class="type-name">Left</span> x)
+    {<span class="symbol">|</span>c<span class="symbol">=</span>x<span class="symbol">|</span>} <span class="symbol">-&gt;</span> <span class="type-name">Right</span> (<span class="type-name">Right</span> x)
+  bwd <span class="symbol">=</span> <span class="symbol">\</span>v<span class="symbol">.</span> <span class="keyword">case</span> v <span class="keyword">of</span>
+    <span class="type-name">Left</span>  x <span class="symbol">-&gt;</span> {<span class="symbol">|</span>a<span class="symbol">=</span>x<span class="symbol">|</span>}
+    <span class="type-name">Right</span> x <span class="symbol">-&gt;</span> <span class="keyword">case</span> x <span class="keyword">of</span>
+      <span class="type-name">Left</span>  y <span class="symbol">-&gt;</span> {<span class="symbol">|</span>b<span class="symbol">=</span>y<span class="symbol">|</span>}
+      <span class="type-name">Right</span> y <span class="symbol">-&gt;</span> {<span class="symbol">|</span>c<span class="symbol">=</span>y<span class="symbol">|</span>}
+  <span class="type-name">MkIso</span> {fwd<span class="symbol">,</span> bwd}
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">Ix</span> {a<span class="command">:n</span> <span class="symbol">|</span> b<span class="command">:m</span> <span class="symbol">|</span> c<span class="command">:q</span>} <span class="keyword">given</span> {n m q} [<span class="type-name">Ix</span> n<span class="symbol">,</span> <span class="type-name">Ix</span> m<span class="symbol">,</span> <span class="type-name">Ix</span> q]
+  size <span class="symbol">=</span> size n <span class="symbol">+</span> size m <span class="symbol">+</span> size q
+  ordinal <span class="symbol">=</span> ordinal <span class="symbol">&lt;&lt;&lt;</span> app_iso abc_to_either
+  unsafe_from_ordinal <span class="symbol">=</span> unsafe_from_ordinal _ <span class="symbol">&gt;&gt;&gt;</span> rev_iso abc_to_either
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> ab_to_either {a b} <span class="symbol">:</span> <span class="type-name">Iso</span> {a<span class="command">:a</span> <span class="symbol">|</span> b<span class="command">:b</span>} (a<span class="symbol">|</span>b) <span class="symbol">=</span>
+  fwd <span class="symbol">=</span> <span class="symbol">\</span>v<span class="symbol">.</span>  <span class="keyword">case</span> v <span class="keyword">of</span>
+    {<span class="symbol">|</span>a<span class="symbol">=</span>x<span class="symbol">|</span>} <span class="symbol">-&gt;</span> <span class="type-name">Left</span> x
+    {<span class="symbol">|</span>b<span class="symbol">=</span>x<span class="symbol">|</span>} <span class="symbol">-&gt;</span> <span class="type-name">Right</span> x
+  bwd <span class="symbol">=</span> <span class="symbol">\</span>v<span class="symbol">.</span> <span class="keyword">case</span> v <span class="keyword">of</span>
+    <span class="type-name">Left</span> x  <span class="symbol">-&gt;</span> {<span class="symbol">|</span>a<span class="symbol">=</span>x<span class="symbol">|</span>}
+    <span class="type-name">Right</span> x <span class="symbol">-&gt;</span> {<span class="symbol">|</span>b<span class="symbol">=</span>x<span class="symbol">|</span>}
+  <span class="type-name">MkIso</span> {fwd<span class="symbol">,</span> bwd}
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">Ix</span> {a<span class="command">:n</span> <span class="symbol">|</span> b<span class="command">:m</span>} <span class="keyword">given</span> {n m} [<span class="type-name">Ix</span> n<span class="symbol">,</span> <span class="type-name">Ix</span> m]
+  size <span class="symbol">=</span> size n <span class="symbol">+</span> size m
+  ordinal <span class="symbol">=</span> ordinal <span class="symbol">&lt;&lt;&lt;</span> app_iso ab_to_either
+  unsafe_from_ordinal <span class="symbol">=</span> unsafe_from_ordinal _ <span class="symbol">&gt;&gt;&gt;</span> rev_iso ab_to_either
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> ac_to_either {a c} <span class="symbol">:</span> <span class="type-name">Iso</span> {a<span class="command">:a</span> <span class="symbol">|</span> c<span class="command">:c</span>} (a<span class="symbol">|</span>c) <span class="symbol">=</span>
+  fwd <span class="symbol">=</span> <span class="symbol">\</span>v<span class="symbol">.</span>  <span class="keyword">case</span> v <span class="keyword">of</span>
+    {<span class="symbol">|</span>a<span class="symbol">=</span>x<span class="symbol">|</span>} <span class="symbol">-&gt;</span> <span class="type-name">Left</span> x
+    {<span class="symbol">|</span>c<span class="symbol">=</span>x<span class="symbol">|</span>} <span class="symbol">-&gt;</span> <span class="type-name">Right</span> x
+  bwd <span class="symbol">=</span> <span class="symbol">\</span>v<span class="symbol">.</span> <span class="keyword">case</span> v <span class="keyword">of</span>
+    <span class="type-name">Left</span> x  <span class="symbol">-&gt;</span> {<span class="symbol">|</span>a<span class="symbol">=</span>x<span class="symbol">|</span>}
+    <span class="type-name">Right</span> x <span class="symbol">-&gt;</span> {<span class="symbol">|</span>c<span class="symbol">=</span>x<span class="symbol">|</span>}
+  <span class="type-name">MkIso</span> {fwd<span class="symbol">,</span> bwd}
+</div></div><div class="cell"><div class="code-block"><span class="keyword">instance</span> <span class="type-name">Ix</span> {a<span class="command">:n</span> <span class="symbol">|</span> c<span class="command">:m</span>} <span class="keyword">given</span> {n m} [<span class="type-name">Ix</span> n<span class="symbol">,</span> <span class="type-name">Ix</span> m]
+  size <span class="symbol">=</span> size n <span class="symbol">+</span> size m
+  ordinal <span class="symbol">=</span> ordinal <span class="symbol">&lt;&lt;&lt;</span> app_iso ac_to_either
+  unsafe_from_ordinal <span class="symbol">=</span> unsafe_from_ordinal _ <span class="symbol">&gt;&gt;&gt;</span> rev_iso ac_to_either
+</div></div><div class="cell"><div class="code-block">
+</div></div><div class="cell"><div class="code-block"><span class="command">:p</span>
+  x <span class="symbol">=</span> iota {a<span class="symbol">:</span><span class="type-name">Fin</span> 2 <span class="symbol">|</span> b<span class="symbol">:</span><span class="type-name">Fin</span> 2 <span class="symbol">|</span> c<span class="symbol">:</span><span class="type-name">Fin</span> 2}
+  v1 <span class="symbol">=</span> x
+  v2 <span class="symbol">=</span> slice_fields (<span class="iso-sugar">#|a</span> <span class="symbol">&amp;&gt;&gt;</span> <span class="iso-sugar">#|b</span>) x
+  v3 <span class="symbol">=</span> slice_fields (<span class="iso-sugar">#|a</span> <span class="symbol">&amp;&gt;&gt;</span> <span class="iso-sugar">#|c</span>) x
+  v4 <span class="symbol">=</span> slice_fields (<span class="iso-sugar">#|a</span> <span class="symbol">&amp;&gt;&gt;</span> <span class="iso-sugar">#|b</span> <span class="symbol">&amp;&gt;&gt;</span> <span class="iso-sugar">#|c</span>) x
+  (v1<span class="symbol">,</span> v2<span class="symbol">,</span> v3<span class="symbol">,</span> v4)
+</div><div class="result-block">( [0, 1, 2, 3, 4, 5]@{a: Fin 2 | b: Fin 2 | c: Fin 2}
+, ( [0, 1, 2, 3]@{a: Fin 2 | b: Fin 2}
+, ( [0, 1, 4, 5]@{a: Fin 2 | c: Fin 2}
+, [0, 1, 2, 3, 4, 5]@{a: Fin 2 | b: Fin 2 | c: Fin 2} ) ) )</div></div></div></body></html>
