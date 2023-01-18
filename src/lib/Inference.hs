@@ -119,7 +119,7 @@ inferTopUDecl (UInstance className bs params methods maybeName) result = do
       applyRename (instanceName' @> instanceAtomName) result
     _ -> error "impossible"
 inferTopUDecl decl@(ULet _ (UPatAnn p ann) rhs) result = do
-  block <- liftInfererM $ solveLocal $ buildBlockInf do
+  block <- liftInfererM $ solveLocalBlock $ buildBlockInf do
     val <- checkMaybeAnnExpr (getNameHint p) ann rhs
     -- This is just for type checking. We don't actually generate
     -- pattern-matching code at the top level
@@ -586,6 +586,19 @@ instance Solver (InfererM i) where
       (RNest _ (_:>RightE (InfVarBound _ ctx))) -> do
         addSrcContext ctx $ throw TypeErr $ "Ambiguous type variable:\n" ++ pprint frag
       _ -> error "not possible?"
+
+solveLocalBlock :: (forall (l :: S). (EmitsInf l, Ext n l, Distinct l) => InfererM i l (CBlock l))
+                -> InfererM i n (CBlock n)
+solveLocalBlock cont = do
+    Abs (InfOutFrag unsolvedInfNames _ _) result <- runLocalInfererM cont
+    go unsolvedInfNames result
+    where
+      go :: InfEmissions p q -> CBlock q -> InfererM i p (CBlock p)
+      go REmpty block = return block
+      go (RNest rest (b:>RightE (InfVarBound ty _))) block =
+        let lam = Lam (UnaryLamExpr (b:> ty) block) ImplicitArrow (Abs (b:>ty) Pure)
+        in go rest (Block NoBlockAnn Empty lam)
+      go _ _ = error "not possible?"
 
 instance InfBuilder (InfererM i) where
   buildDeclsInfUnzonked cont = do
