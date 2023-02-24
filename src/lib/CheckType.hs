@@ -340,7 +340,8 @@ dictExprType e = case e of
   IxFin n -> do
     n' <- checkTypeE NatTy n
     liftM DictTy $ ixDictType $ NewtypeTyCon $ Fin n'
-  DataData ty -> DictTy <$> (dataDictType =<< checkTypeE TyKind ty)
+  DataData ty   -> DictTy <$> (dataDictType =<< checkTypeE TyKind ty)
+  SelfDict ty _ -> checkTypeE TyKind (DictTy ty)
 
 instance HasType CoreIR DictExpr where
   getTypeE e = dictExprType e

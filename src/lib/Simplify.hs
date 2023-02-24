@@ -39,6 +39,11 @@ import Types.Core
 import Types.Primitives
 import Util (enumerate, foldMapM, restructure, bindM2, toSnocList)
 
+
+import GenericTraversal
+import Control.Monad.State.Strict
+import MTL1
+
 -- === Simplification ===
 
 -- The purpose of simplification is that we want first-class functions
@@ -900,12 +905,56 @@ simplifyOp op = do
 pattern CoerceReconAbs :: Abs (Nest b) ReconstructAtom n
 pattern CoerceReconAbs <- Abs _ (CoerceRecon _)
 
+type InstanceDefSelfDictTraverserM =
+  GenericTraverserM CoreIR UnitB InstanceDefSelfDictTraverserS
+
+liftInstanceDefDummyTraverserM
+  :: EnvReader m
+  => InstanceName n
+  -> InstanceDefSelfDictTraverserM n n a
+  -> m n a
+liftInstanceDefDummyTraverserM instanceName m = do
+  (ans, _) <- liftGenericTraverserM (InstanceDefSelfDictTraverserS instanceName) m
+  return ans
+
+data InstanceDefSelfDictTraverserS (n::S) = InstanceDefSelfDictTraverserS (InstanceName n)
+
+instance GenericE InstanceDefSelfDictTraverserS where
+  type RepE InstanceDefSelfDictTraverserS = InstanceName
+  fromE (InstanceDefSelfDictTraverserS name) = name
+  toE name = InstanceDefSelfDictTraverserS name
+
+instance SinkableE InstanceDefSelfDictTraverserS
+instance HoistableE InstanceDefSelfDictTraverserS
+instance HoistableState InstanceDefSelfDictTraverserS where
+  hoistState (InstanceDefSelfDictTraverserS _) b (InstanceDefSelfDictTraverserS n) =
+    let name = ignoreHoistFailure $ hoist b n  -- !!!
+    in InstanceDefSelfDictTraverserS name
+
+instance GenericTraverser CoreIR UnitB InstanceDefSelfDictTraverserS where
+  traverseAtom (DictCon (SelfDict _ args)) = do
+    InstanceDefSelfDictTraverserS instanceName <- get
+    args' <- mapM traverseAtom args
+    return $ DictCon $ InstanceDict instanceName args'
+  traverseAtom atom = traverseAtomDefault atom
+
+-- Also traverse the looked up instance definition to replace occurrences of
+-- `SelfDict` (in the instance method definitions) with `InstanceDict instanceName`.
+lookupInstanceDef' :: EnvReader m => InstanceName n -> m n (InstanceDef n)
+lookupInstanceDef' instanceName = lookupEnv instanceName >>= \case
+  InstanceBinding (InstanceDef className bs params body) ->
+    liftEnvReaderM $ refreshAbs (Abs bs (ListE params `PairE` body))
+      \bs' (ListE params' `PairE` InstanceBody superclasses methods) -> do
+        methods' <- mapM (liftInstanceDefDummyTraverserM (sink instanceName) . traverseGenericE) methods
+        return $ InstanceDef className bs' params' $ InstanceBody superclasses methods'
+{-# INLINE lookupInstanceDef' #-}
+
 projectDictMethod :: Emits o => CAtom o -> Int -> SimplifyM i o (CAtom o)
 projectDictMethod d i = do
   cheapNormalize d >>= \case
     DictCon (InstanceDict instanceName args) -> dropSubst do
       args' <- mapM simplifyAtom args
-      InstanceDef _ bs _ body <- lookupInstanceDef instanceName
+      InstanceDef _ bs _ body <- lookupInstanceDef' instanceName
       let InstanceBody _ methods = body
       let method = methods !! i
       extendSubst (bs@@>(SubstVal <$> args')) $

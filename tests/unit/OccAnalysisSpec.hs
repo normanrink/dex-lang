@@ -42,7 +42,7 @@ uExprToBlock :: (Topper m, Mut n) => UExpr 'VoidS -> m n (SBlock n)
 uExprToBlock expr = do
   renamed <- renameSourceNamesUExpr expr
   typed <- inferTopUExpr renamed
-  synthed <- synthTopBlock typed
+  synthed <- synthTopBlock Nothing typed
   (SimplifiedBlock block (CoerceRecon _)) <- simplifyTopBlock synthed
   return block
 

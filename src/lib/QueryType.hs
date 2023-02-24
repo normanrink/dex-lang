@@ -371,6 +371,7 @@ dictExprType e = case e of
     n' <- substM n
     liftM DictTy $ ixDictType $ NewtypeTyCon $ Fin n'
   DataData ty -> DictTy <$> (dataDictType =<< substM ty)
+  SelfDict ty _ -> DictTy <$> substM ty
 
 getIxClassName :: (Fallible1 m, EnvReader m) => m n (ClassName n)
 getIxClassName = lookupSourceMap "Ix" >>= \case

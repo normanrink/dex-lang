@@ -203,8 +203,9 @@ instance GenericallyTraversableE CoreIR DictExpr where
     InstanceDict v args -> InstanceDict <$> substM v <*> mapM tge args
     InstantiatedGiven given args -> InstantiatedGiven <$> tge given <*> mapM tge args
     SuperclassProj subclass i -> SuperclassProj <$> tge subclass <*> pure i
-    IxFin n     -> IxFin <$> tge n
-    DataData ty -> DataData <$> tge ty
+    IxFin n          -> IxFin <$> tge n
+    DataData ty      -> DataData <$> tge ty
+    SelfDict ty args -> SelfDict <$> tge ty <*> mapM tge args
 
 instance GenericallyTraversableE r (IxDict r) where
   traverseGenericE = \case

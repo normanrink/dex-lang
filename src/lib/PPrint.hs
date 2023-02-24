@@ -258,6 +258,7 @@ instance Pretty (DictExpr n) where
     SuperclassProj d' i -> "SuperclassProj" <+> p d' <+> p i
     IxFin n -> "Ix (Fin" <+> p n <> ")"
     DataData a -> "Data " <+> p a
+    SelfDict ty args -> "SelfDict" <+> p ty <+> p (toList args)
 
 instance IRRep r => Pretty (IxDict r n) where
   pretty = \case

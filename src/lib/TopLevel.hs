@@ -540,7 +540,7 @@ evalBlock typed = do
   -- In most cases it should be easiest to add new passes to simpOptimizations or
   -- loweredOptimizations, below, because those are reused in all three places.
   checkEffects Pure typed
-  synthed <- checkPass SynthPass $ synthTopBlock typed
+  synthed <- checkPass SynthPass $ synthTopBlock Nothing typed
   simplifiedBlock <- checkPass SimpPass $ simplifyTopBlock synthed
   SimplifiedBlock simp recon <- return simplifiedBlock
   checkEffects Pure simp

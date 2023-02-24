@@ -1966,7 +1966,7 @@ checkInstanceBody className params methods = do
   def@(ClassDef _ methodNames _ _ _ ) <- getClassDef className
   Abs superclassBs methodTys <- checkedApplyClassParams def params
   SuperclassBinders bs superclassTys <- return superclassBs
-  superclassDicts <- mapM trySynthTerm superclassTys
+  superclassDicts <- mapM (trySynthTerm' Nothing) superclassTys
   ListE methodTys' <- applySubst (bs @@> map SubstVal superclassDicts) methodTys
   methodsChecked <- mapM (checkMethodDef className methodTys') methods
   let (idxs, methods') = unzip $ sortOn fst $ methodsChecked
@@ -2869,9 +2869,10 @@ renameForPrinting e = do
 
 -- === dictionary synthesis ===
 
-synthTopBlock :: (EnvReader m, Fallible1 m) => CBlock n -> m n (CBlock n)
-synthTopBlock block = do
-  (liftExcept =<<) $ liftDictSynthTraverserM $ traverseGenericE block
+synthTopBlock :: (EnvReader m, Fallible1 m)
+              => Maybe (SynthType n) -> CBlock n -> m n (CBlock n)
+synthTopBlock selfSynthTy block = do
+  (liftExcept =<<) $ liftDictSynthTraverserM selfSynthTy $ traverseGenericE block
 {-# SCC synthTopBlock #-}
 
 -- Given a simplified dict (an Atom of type `DictTy _` in the
@@ -2911,6 +2912,7 @@ generalizeDictRec dict = do
     InstantiatedGiven _ _ -> notSimplifiedDict
     SuperclassProj _ _    -> notSimplifiedDict
     DataData ty           -> DataData <$> Var <$> freshInferenceName ty
+    SelfDict _ _          -> notSimplifiedDict
     where notSimplifiedDict = error $ "Not a simplified dict: " ++ pprint dict
 
 generalizeInstanceArgs :: EmitsInf n => Nest RolePiBinder n l -> [CAtom n] -> SolverM n [CAtom n]
@@ -2933,19 +2935,26 @@ generalizeInstanceArgs _ _ = error "zip error"
 synthInstanceDef
   :: (EnvReader m, Fallible1 m) => InstanceDef n -> m n (InstanceDef n)
 synthInstanceDef (InstanceDef className bs params body) = do
+  -- The type of the instance that is synthesized by this function:
+  synthTy <- getInstanceType' className bs params
   liftExceptEnvReaderM $ refreshAbs (Abs bs (ListE params `PairE` body))
     \bs' (ListE params' `PairE` InstanceBody superclasses methods) -> do
-      methods' <- mapM synthTopBlock methods
+      methods' <- mapM (synthTopBlock $ Just $ sink synthTy) methods
       return $ InstanceDef className bs' params' $ InstanceBody superclasses methods'
 
 -- main entrypoint to dictionary synthesizer
 trySynthTerm :: (Fallible1 m, EnvReader m) => CType n -> m n (SynthAtom n)
-trySynthTerm ty = do
+trySynthTerm = trySynthTerm' Nothing
+
+-- If argument `selfSynthTy` is `Just x`, then `x` is the type of the instance
+-- whose definition is currenlty being synthesized.
+trySynthTerm' :: (Fallible1 m, EnvReader m) => Maybe (SynthType n) -> CType n -> m n (SynthAtom n)
+trySynthTerm' selfSynthTy ty = do
   hasInferenceVars ty >>= \case
     True -> throw TypeErr "Can't synthesize a dictionary for a type with inference vars"
     False -> do
       synthTy <- liftExcept $ typeAsSynthType ty
-      solutions <- liftSyntherM $ synthTerm synthTy
+      solutions <- liftSyntherM selfSynthTy $ synthTerm synthTy
       case solutions of
         [] -> throw TypeErr $ "Couldn't synthesize a class dictionary for: " ++ pprint ty
         [d] -> cheapNormalize d -- normalize to reduce code size
@@ -2966,26 +2975,32 @@ data Givens n = Givens { fromGivens :: HM.HashMap (EKey SynthType n) (SynthAtom 
 
 class (Alternative1 m, Searcher1 m, EnvReader m, EnvExtender m)
     => Synther m where
+  getContext :: m n (Maybe (SynthType n), Givens n)
   getGivens :: m n (Givens n)
-  withGivens :: Givens n -> m n a -> m n a
+  getMaybeSynthType :: m n (SynthType n)
+  withContext :: Maybe (SynthType n) -> Givens n -> m n a -> m n a
 
 newtype SyntherM (n::S) (a:: *) = SyntherM
-  { runSyntherM' :: OutReaderT Givens (EnvReaderT []) n a }
+  { runSyntherM' :: OutReaderT (MaybeE SynthType `PairE` Givens) (EnvReaderT []) n a }
   deriving ( Functor, Applicative, Monad, EnvReader, EnvExtender
            , ScopeReader, MonadFail
-           , Alternative, Searcher, OutReader Givens)
+           , Alternative, Searcher, OutReader (MaybeE SynthType `PairE` Givens))
 
 instance Synther SyntherM where
-  getGivens = askOutReader
+  getContext = askOutReader >>= \case PairE synthTy givens -> return (fromMaybeE synthTy, givens)
+  {-# INLINE getContext #-}
+  getGivens = snd <$> getContext
   {-# INLINE getGivens #-}
-  withGivens givens cont = localOutReader givens cont
-  {-# INLINE withGivens #-}
+  getMaybeSynthType = (fst <$> getContext) >>= maybe empty pure
+  {-# INLINE getMaybeSynthType #-}
+  withContext synthTy givens cont = localOutReader (toMaybeE synthTy `PairE` givens) cont
+  {-# INLINE withContext #-}
 
-liftSyntherM :: EnvReader m => SyntherM n a -> m n [a]
-liftSyntherM cont =
+liftSyntherM :: EnvReader m => Maybe (SynthType n) -> SyntherM n a -> m n [a]
+liftSyntherM synthTy cont =
   liftEnvReaderT do
     initGivens <- givensFromEnv
-    runOutReaderT initGivens $ runSyntherM' cont
+    runOutReaderT (toMaybeE synthTy `PairE` initGivens) $ runSyntherM' cont
 {-# INLINE liftSyntherM #-}
 
 givensFromEnv :: EnvReader m => m n (Givens n)
@@ -2997,9 +3012,9 @@ givensFromEnv = do
 
 extendGivens :: Synther m => [SynthAtom n] -> m n a -> m n a
 extendGivens newGivens cont = do
-  prevGivens <- getGivens
+  (synthTy, prevGivens) <- getContext
   finalGivens <- getSuperclassClosure prevGivens newGivens
-  withGivens finalGivens cont
+  withContext synthTy finalGivens cont
 {-# INLINE extendGivens #-}
 
 getSynthType :: EnvReader m => SynthAtom n -> m n (SynthType n)
@@ -3094,10 +3109,13 @@ synthDictFromGiven dictTy = do
 synthDictFromInstance :: DictType n -> SyntherM n (SynthAtom n)
 synthDictFromInstance dictTy@(DictType _ targetClass _) = do
   instances <- getInstanceDicts targetClass
-  asum $ instances <&> \candidate -> do
+  (asum $ instances <&> \candidate -> do
     synthTy <- getInstanceType candidate
     args <- instantiateSynthArgs dictTy synthTy
-    return $ DictCon $ InstanceDict candidate args
+    return $ DictCon $ InstanceDict candidate args)
+  <|> (do synthTy <- getMaybeSynthType
+          args <- instantiateSynthArgs dictTy synthTy
+          return $ DictCon $ SelfDict dictTy args)
 
 synthDictForData :: forall n. DictType n -> SyntherM n (SynthAtom n)
 synthDictForData dictTy@(DictType "Data" dName [ty]) = case ty of
@@ -3130,20 +3148,25 @@ synthDictForData dictTy@(DictType "Data" dName [ty]) = case ty of
 synthDictForData dictTy = error $ "Malformed Data dictTy " ++ pprint dictTy
 
 -- TODO: This seems... excessively expensive?
-getInstanceType :: InstanceName n -> SyntherM n (SynthType n)
-getInstanceType instanceName = do
-  InstanceDef className bs params _ <- lookupInstanceDef instanceName
+getInstanceType' :: (EnvReader m) => ClassName n -> Nest RolePiBinder n l -> [CType l] -> m n (SynthType n)
+getInstanceType' className bs params = do
   ClassDef classSourceName _ _ _ _ <- lookupClassDef className
   liftEnvReaderM $ refreshAbs (Abs bs (ListE params)) \bs' (ListE params') -> do
     className' <- sinkM className
     return $ go bs' classSourceName className' params'
   where
-    go :: Nest RolePiBinder n l -> SourceName -> ClassName l -> [CAtom l] -> SynthType n
-    go bs classSourceName className params = case bs of
-      Empty -> SynthDictType $ DictType classSourceName className params
-      Nest (RolePiBinder b ty arr _) rest ->
-        let restTy = go rest classSourceName className params
-        in SynthPiType $ Abs (PiBinder b ty arr) restTy
+      go :: Nest RolePiBinder n l -> SourceName -> ClassName l -> [CAtom l] -> SynthType n
+      go bs' classSourceName className' params' = case bs' of
+        Empty -> SynthDictType $ DictType classSourceName className' params'
+        Nest (RolePiBinder b ty arr _) rest ->
+            let restTy = go rest classSourceName className' params'
+            in SynthPiType $ Abs (PiBinder b ty arr) restTy
+{-# SCC getInstanceType' #-}
+
+getInstanceType :: InstanceName n -> SyntherM n (SynthType n)
+getInstanceType instanceName = do
+  InstanceDef className bs params _ <- lookupInstanceDef instanceName
+  getInstanceType' className bs params
 {-# SCC getInstanceType #-}
 
 instantiateSynthArgs :: DictType n -> SynthType n -> SyntherM n [CAtom n]
@@ -3162,16 +3185,16 @@ instantiateSynthArgsRec
   => [Atom CoreIR n] -> DictType n -> SubstFrag AtomSubstVal n l n
   -> SynthType l -> SolverM n [CAtom n]
 instantiateSynthArgsRec prevArgsRec dictTy subst synthTy = case synthTy of
-  SynthPiType (Abs (PiBinder b argTy arrow) resultTy) -> do
-    argTy' <- applySubst subst argTy
-    param <- case arrow of
-      ImplicitArrow -> Var <$> freshInferenceName argTy'
-      ClassArrow -> return $ DictHole (AlwaysEqual Nothing) argTy'
-      _ -> error $ "Not a valid arrow type for synthesis: " ++ pprint arrow
-    instantiateSynthArgsRec (param:prevArgsRec) dictTy (subst <.> b @> SubstVal param) resultTy
-  SynthDictType dictTy' -> do
-    unify dictTy =<< applySubst subst dictTy'
-    return $ reverse prevArgsRec
+    SynthPiType (Abs (PiBinder b argTy arrow) resultTy) -> do
+      argTy' <- applySubst subst argTy
+      param <- case arrow of
+        ImplicitArrow -> Var <$> freshInferenceName argTy'
+        ClassArrow -> return $ DictHole (AlwaysEqual Nothing) argTy'
+        _ -> error $ "Not a valid arrow type for synthesis: " ++ pprint arrow
+      instantiateSynthArgsRec (param:prevArgsRec) dictTy (subst <.> b @> SubstVal param) resultTy
+    SynthDictType dictTy' -> do
+      unify dictTy =<< applySubst subst dictTy'
+      return $ reverse prevArgsRec
 
 instance GenericE Givens where
   type RepE Givens = HashMapE (EKey SynthType) SynthAtom
@@ -3186,31 +3209,38 @@ instance SinkableE Givens where
 
 liftDictSynthTraverserM
   :: EnvReader m
-  => DictSynthTraverserM n n a
+  => Maybe (SynthType n)
+  -> DictSynthTraverserM n n a
   -> m n (Except a)
-liftDictSynthTraverserM m = do
-  (ans, errs) <- liftGenericTraverserM (coerce $ Errs []) m
-  return $ case coerce errs of
+liftDictSynthTraverserM selfSynthTy m = do
+  (ans, DictSynthTraverserS _ errs) <- liftGenericTraverserM (DictSynthTraverserS selfSynthTy $ coerce $ Errs []) m
+  return $ case errs of
     Errs [] -> Success ans
     _       -> Failure $ coerce errs
 
 type DictSynthTraverserM = GenericTraverserM CoreIR UnitB DictSynthTraverserS
 
-newtype DictSynthTraverserS (n::S) = DictSynthTraverserS Errs
-instance GenericE DictSynthTraverserS where
-  type RepE DictSynthTraverserS = LiftE Errs
-  fromE = LiftE . coerce
-  toE = coerce . fromLiftE
-instance SinkableE DictSynthTraverserS
-instance HoistableState DictSynthTraverserS where
-  hoistState _ _ (DictSynthTraverserS errs) = DictSynthTraverserS errs
+data DictSynthTraverserS (n::S) = DictSynthTraverserS (Maybe (SynthType n)) Errs
+instance GenericE (DictSynthTraverserS) where
+  type RepE (DictSynthTraverserS) = PairE (MaybeE SynthType) (LiftE Errs)
+  fromE (DictSynthTraverserS synthTy errs) = PairE (toMaybeE synthTy) (LiftE errs)
+  toE (PairE synthTy (LiftE errs)) = DictSynthTraverserS (fromMaybeE synthTy) errs
+instance SinkableE (DictSynthTraverserS)
+instance HoistableState (DictSynthTraverserS) where
+  hoistState _ _ (DictSynthTraverserS Nothing errs) = DictSynthTraverserS Nothing errs
+  hoistState _ b (DictSynthTraverserS (Just synthTy) errs) =
+    case hoist b synthTy of
+      HoistFailure _ -> DictSynthTraverserS Nothing errs
+      HoistSuccess synthTy' -> DictSynthTraverserS (Just synthTy') errs
 
-instance GenericTraverser CoreIR UnitB DictSynthTraverserS where
+instance GenericTraverser CoreIR UnitB (DictSynthTraverserS) where
   traverseAtom a@(DictHole (AlwaysEqual ctx) ty) = do
     ty' <- cheapNormalize =<< traverseAtom ty
-    ans <- liftEnvReaderT $ addSrcContext ctx $ trySynthTerm ty'
+    DictSynthTraverserS selfSynthTy _ <- get
+    ans <- liftEnvReaderT $ addSrcContext ctx $ trySynthTerm' selfSynthTy ty'
     case ans of
-      Failure errs -> put (DictSynthTraverserS errs) >> substM a
+      Failure errs -> do
+        put (DictSynthTraverserS selfSynthTy errs) >> substM a
       Success d    -> return d
   traverseAtom atom = traverseAtomDefault atom
 
