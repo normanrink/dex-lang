@@ -1,0 +1,12 @@
+
+interface FooBar1 a
+  foo : a -> Int
+  bar : a -> Int
+
+instance FooBar1 Int
+  foo = \x. x + 1
+  -- Fails: The definition of `bar` uses `bar`, which requires a dictionary
+  -- `d : FooBar2 Int` that has access to method `bar` (with index 1) of
+  -- `FooBar2 Int`; but this method `bar` (with index 1) of instance
+  -- `FooBar2 Int` is currently still being defined.
+  bar = \x. bar x + 1

@@ -406,7 +406,7 @@ data MethodType (n::S) =
     (CType n)  -- actual method type
  deriving (Show, Generic)
 
-data DictType (n::S) = DictType SourceName (ClassName n) [CType n]
+data DictType (n::S) = DictType SourceName (ClassName n) [CType n] [Int]
      deriving (Show, Generic)
 
 data DictExpr (n::S) =
@@ -1842,17 +1842,23 @@ instance AlphaHashableE MethodType
 instance RenameE     MethodType
 
 instance GenericE DictType where
-  type RepE DictType = LiftE SourceName `PairE` ClassName `PairE` ListE CType
-  fromE (DictType sourceName className params) =
-    LiftE sourceName `PairE` className `PairE` ListE params
-  toE (LiftE sourceName `PairE` className `PairE` ListE params) =
-    DictType sourceName className params
+  type RepE DictType = LiftE SourceName `PairE` ClassName `PairE` (ListE CType) `PairE` ListE (LiftE Int)
+  fromE (DictType sourceName className params idxs) =
+    LiftE sourceName `PairE` className `PairE` (ListE params) `PairE` ListE (map LiftE idxs)
+  toE (LiftE sourceName `PairE` className `PairE` (ListE params) `PairE` ListE idxs) =
+    DictType sourceName className params (map fromLiftE idxs)
 
 instance SinkableE      DictType
 instance HoistableE     DictType
-instance AlphaEqE       DictType
 instance AlphaHashableE DictType
 instance RenameE        DictType
+
+-- Disregard method indices for alpha equivalence of dictionary types.
+instance AlphaEqE DictType where
+  alphaEqE (DictType sn cn params _) (DictType sn' cn' params' _) = do
+    alphaEqE (LiftE sn) (LiftE sn')
+    alphaEqE cn cn'
+    mapM_ (uncurry alphaEqE) (zip params params')
 
 instance GenericE DictExpr where
   type RepE DictExpr =

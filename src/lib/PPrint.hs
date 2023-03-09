@@ -266,8 +266,8 @@ instance IRRep r => Pretty (IxDict r n) where
     IxDictSpecialized _ d xs -> p d <+> p xs
 
 instance Pretty (DictType n) where
-  pretty (DictType classSourceName _ params) =
-    p classSourceName <+> spaced params
+  pretty (DictType classSourceName _ params idxs) =
+    p classSourceName <+> spaced params <+> brackets (spaced idxs)
 
 instance IRRep r => Pretty (DepPairType r n) where pretty = prettyFromPrettyPrec
 instance IRRep r => PrettyPrec (DepPairType r n) where

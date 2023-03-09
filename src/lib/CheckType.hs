@@ -95,13 +95,13 @@ checkTypeE reqTy e = do
 
 checkTypesEq :: (Typer m, IRRep r) => Type r o -> Type r o -> m i o ()
 checkTypesEq reqTy ty = alphaEq reqTy ty >>= \case
-  True  -> return ()
-  False -> {-# SCC typeNormalization #-} do
-    reqTy' <- cheapNormalize reqTy
-    ty'    <- cheapNormalize ty
-    alphaEq reqTy' ty' >>= \case
-      True  -> return ()
-      False -> throw TypeErr $ pprint reqTy' ++ " != " ++ pprint ty'
+    True  -> return ()
+    False -> {-# SCC typeNormalization #-} do
+      reqTy' <- cheapNormalize reqTy
+      ty'    <- cheapNormalize ty
+      alphaEq reqTy' ty' >>= \case
+        True  -> return ()
+        False -> throw TypeErr $ pprint reqTy' ++ " != " ++ pprint ty'
 {-# INLINE checkTypesEq #-}
 
 class SinkableE e => CheckableE (e::E) where
@@ -190,7 +190,7 @@ instance IRRep r => HasType r (Atom r) where
     PtrVar v -> renameM v >>= lookupEnv >>= \case
       PtrBinding ty _ -> return $ PtrTy ty
     DictCon dictExpr -> getTypeE dictExpr
-    DictTy (DictType _ className params) -> do
+    DictTy (DictType _ className params _) -> do
       ClassDef _ _ paramBs _ _ <- renameM className >>= lookupClassDef
       params' <- mapM renameM params
       checkArgTys paramBs params'
@@ -231,71 +231,71 @@ instance (ToBinding ann c, Color c, CheckableE ann) => CheckableB (BinderP c ann
 
 typeCheckExpr :: (Typer m, IRRep r) => EffectRow r o -> Expr r i -> m i o (Type r o)
 typeCheckExpr effs expr = case expr of
-  App f xs -> do
-    fTy <- getTypeE f
-    checkApp effs fTy $ toList xs
-  TabApp f xs -> do
-    fTy <- getTypeE f
-    checkTabApp fTy xs
-  -- TODO: check!
-  TopApp f xs -> do
-    NaryPiType bs _ resultTy <- getTypeTopFun =<< renameM f
-    xs' <- mapM renameM xs
-    checkedApplyNaryAbs (Abs bs resultTy) xs'
-  Atom x   -> getTypeE x
-  PrimOp op -> typeCheckPrimOp effs op
-  Hof  hof -> typeCheckPrimHof effs hof
-  Case e alts resultTy caseEffs -> do
-    caseEffs' <- renameM caseEffs
-    resultTy'  <- renameM resultTy
-    checkCase e alts resultTy' caseEffs'
-    checkExtends effs caseEffs'
-    return resultTy'
-  RefOp ref m -> do
-    TC (RefType h s) <- getTypeE ref
-    case m of
-      MGet      ->           declareEff effs (RWSEffect State  h) $> s
-      MPut  x   -> x|:s   >> declareEff effs (RWSEffect State  h) $> UnitTy
-      MAsk      ->           declareEff effs (RWSEffect Reader h) $> s
-      MExtend _ x -> x|:s >> declareEff effs (RWSEffect Writer h) $> UnitTy
-      IndexRef i -> do
-        TabTy (b:>IxType iTy _) eltTy <- return s
-        i' <- checkTypeE iTy i
-        eltTy' <- applyAbs (Abs b eltTy) (SubstVal i')
-        return $ TC $ RefType h eltTy'
-      ProjRef i -> do
-        ProdTy tys <- return s
-        return $ TC $ RefType h $ tys !! i
-  ProjMethod dict i -> do
-    DictTy (DictType _ className params) <- getTypeE dict
-    def@(ClassDef _ _ paramBs classBs methodTys) <- lookupClassDef className
-    let MethodType _ methodTy = methodTys !! i
-    superclassDicts <- getSuperclassDicts def <$> renameM dict
-    let subst = (    paramBs @@> map SubstVal params
-                 <.> classBs @@> map SubstVal superclassDicts)
-    applySubst subst methodTy
-  TabCon _ ty xs -> do
-    ty'@(TabPi (TabPiType b restTy)) <- checkTypeE TyKind ty
-    case fromConstAbs (Abs b restTy) of
-      HoistSuccess elTy -> forM_ xs (|: elTy)
-      -- XXX: in the dependent case we don't check that the element types
-      -- match the annotation because that would require concretely evaluating
-      -- each index from the ix dict.
-      HoistFailure _    -> forM_ xs checkE
-    return ty'
-  RecordVariantOp x -> typeCheckRecordVariantOp x
-  DAMOp op -> typeCheckDAMOp effs op
-  UserEffectOp op -> typeCheckUserEffect op
+    App f xs -> do
+      fTy <- getTypeE f
+      checkApp effs fTy $ toList xs
+    TabApp f xs -> do
+      fTy <- getTypeE f
+      checkTabApp fTy xs
+    -- TODO: check!
+    TopApp f xs -> do
+      NaryPiType bs _ resultTy <- getTypeTopFun =<< renameM f
+      xs' <- mapM renameM xs
+      checkedApplyNaryAbs (Abs bs resultTy) xs'
+    Atom x   -> getTypeE x
+    PrimOp op -> typeCheckPrimOp effs op
+    Hof  hof -> typeCheckPrimHof effs hof
+    Case e alts resultTy caseEffs -> do
+      caseEffs' <- renameM caseEffs
+      resultTy'  <- renameM resultTy
+      checkCase e alts resultTy' caseEffs'
+      checkExtends effs caseEffs'
+      return resultTy'
+    RefOp ref m -> do
+      TC (RefType h s) <- getTypeE ref
+      case m of
+        MGet      ->           declareEff effs (RWSEffect State  h) $> s
+        MPut  x   -> x|:s   >> declareEff effs (RWSEffect State  h) $> UnitTy
+        MAsk      ->           declareEff effs (RWSEffect Reader h) $> s
+        MExtend _ x -> x|:s >> declareEff effs (RWSEffect Writer h) $> UnitTy
+        IndexRef i -> do
+          TabTy (b:>IxType iTy _) eltTy <- return s
+          i' <- checkTypeE iTy i
+          eltTy' <- applyAbs (Abs b eltTy) (SubstVal i')
+          return $ TC $ RefType h eltTy'
+        ProjRef i -> do
+          ProdTy tys <- return s
+          return $ TC $ RefType h $ tys !! i
+    ProjMethod dict i -> do
+      DictTy (DictType _ className params _) <- getTypeE dict
+      def@(ClassDef _ _ paramBs classBs methodTys) <- lookupClassDef className
+      let MethodType _ methodTy = methodTys !! i
+      superclassDicts <- getSuperclassDicts def <$> renameM dict
+      let subst = (    paramBs @@> map SubstVal params
+                  <.> classBs @@> map SubstVal superclassDicts)
+      applySubst subst methodTy
+    TabCon _ ty xs -> do
+      ty'@(TabPi (TabPiType b restTy)) <- checkTypeE TyKind ty
+      case fromConstAbs (Abs b restTy) of
+        HoistSuccess elTy -> forM_ xs (|: elTy)
+        -- XXX: in the dependent case we don't check that the element types
+        -- match the annotation because that would require concretely evaluating
+        -- each index from the ix dict.
+        HoistFailure _    -> forM_ xs checkE
+      return ty'
+    RecordVariantOp x -> typeCheckRecordVariantOp x
+    DAMOp op -> typeCheckDAMOp effs op
+    UserEffectOp op -> typeCheckUserEffect op
 
 instance IRRep r => HasType r (Block r) where
   getTypeE = \case
-    Block NoBlockAnn Empty atom -> getTypeE atom
-    Block (BlockAnn reqTy effs') decls result -> do
-      effs <- renameM effs'
-      reqTy' <- renameM reqTy
-      go effs reqTy' decls result
-      return reqTy'
-    Block _ _ _ -> error "impossible"
+      Block NoBlockAnn Empty atom -> getTypeE atom
+      Block (BlockAnn reqTy effs') decls result -> do
+        effs <- renameM effs'
+        reqTy' <- renameM reqTy
+        go effs reqTy' decls result
+        return reqTy'
+      Block _ _ _ -> error "impossible"
    where
     go :: Typer m => EffectRow r o -> Type r o -> Nest (Decl r) i i' -> Atom r i' -> m i o ()
     go _ reqTy Empty result = result |: reqTy
@@ -323,16 +323,19 @@ dictExprType e = case e of
   InstanceDict instanceName args -> do
     instanceName' <- renameM instanceName
     InstanceDef className bs params _ <- lookupInstanceDef instanceName'
-    ClassDef sourceName _ _ _ _ <- lookupClassDef className
+    ClassDef sourceName _ _ _ methodTys <- lookupClassDef className
     args' <- mapM renameM args
     checkArgTys bs args'
     ListE params' <- applyNaryAbs (Abs bs (ListE params)) (map SubstVal args')
-    return $ DictTy $ DictType sourceName className params'
+    -- Instance definitions can access all methods defined by the instance, hence
+    -- add all method indices (total number: `length methodTys`) to the returned
+    -- dictionary type.
+    return $ DictTy $ DictType sourceName className params' [0..(length methodTys - 1)]
   InstantiatedGiven given args -> do
     givenTy <- getTypeE given
     checkApp Pure givenTy (toList args)
   SuperclassProj d i -> do
-    DictTy (DictType _ className params) <- getTypeE d
+    DictTy (DictType _ className params _) <- getTypeE d
     ClassDef _ _ bs superclasses _ <- lookupClassDef className
     checkedApplyNaryAbs
       (Abs (toBinderNest bs) (superclassTypes superclasses !! i))

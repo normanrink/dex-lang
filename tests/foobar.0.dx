@@ -1,0 +1,18 @@
+
+interface FooBar0 a
+  foo : a -> Int
+  bar : a -> Int
+
+instance FooBar0 Int
+  foo = \x. x + 1
+  bar = \x. foo x + 1
+
+x : Int = 42
+
+%passes typed
+y = foo x
+y
+
+%passes typed
+z = bar x
+z

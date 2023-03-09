@@ -121,10 +121,10 @@ traverseTyParams
   -> (forall l . DExt n l => ParamRole -> Type CoreIR l -> Atom CoreIR l -> m l (Atom CoreIR l))
   -> m n (Atom CoreIR n)
 traverseTyParams ty f = getDistinct >>= \Distinct -> case ty of
-  DictTy (DictType sn name params) -> do
+  DictTy (DictType sn name params idxs) -> do
     Abs paramRoles UnitE <- getClassRoleBinders name
     params' <- traverseRoleBinders f paramRoles params
-    return $ DictTy $ DictType sn name params'
+    return $ DictTy $ DictType sn name params' idxs
   TabPi (TabPiType (b:>(IxType iTy (IxDictAtom d))) resultTy) -> do
     iTy' <- f TypeParam TyKind iTy
     dictTy <- liftM ignoreExcept $ runFallibleT1 $ DictTy <$> ixDictType iTy'

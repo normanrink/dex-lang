@@ -1578,16 +1578,19 @@ checkMaybeAnnExpr hint ty expr = confuseGHC >>= \_ -> case ty of
 dictTypeFun :: EnvReader m => ClassName n -> m n (CAtom n)
 dictTypeFun v = do
   -- TODO: we should cache this in the ClassDef
-  ClassDef classSourceName _ paramBinders _ _ <- lookupClassDef v
+  ClassDef classSourceName _ paramBinders _ methodTys <- lookupClassDef v
   liftEnvReaderM $ refreshAbs (Abs paramBinders UnitE) \bs' UnitE -> do
     v' <- sinkM v
-    return $ go classSourceName bs' v' $ nestToNames bs'
+    -- Construct a lambda (using `go`) that ultimately returns a dictionary type
+    -- that grants access to all methods in the class `v`:
+    let methodIdxs = take (length methodTys) [0..]
+    return $ go methodIdxs classSourceName bs' v' $ nestToNames bs'
   where
-    go :: SourceName -> Nest RolePiBinder n l -> ClassName l -> [CAtomName l] -> CAtom n
-    go classSourceName bs className params = case bs of
-      Empty -> DictTy $ DictType classSourceName className $ map Var params
+    go :: [Int] -> SourceName -> Nest RolePiBinder n l -> ClassName l -> [CAtomName l] -> CAtom n
+    go methodIdxs classSourceName bs className params = case bs of
+      Empty -> DictTy $ DictType classSourceName className (map Var params) methodIdxs
       Nest (RolePiBinder b ty _ _) rest -> do
-        let lamExpr = UnaryLamExpr (b:>ty) $ AtomicBlock $ go classSourceName rest className params
+        let lamExpr = UnaryLamExpr (b:>ty) $ AtomicBlock $ go methodIdxs classSourceName rest className params
         lamExprToAtom lamExpr PlainArrow (Just $ Abs (b:>ty) Pure)
 
 -- TODO: cache this with the instance def (requires a recursive binding)
@@ -2671,8 +2674,9 @@ instance Unifiable (Atom CoreIR) where
       (NewtypeTyCon con, NewtypeTyCon con') -> unify con con'
       _ -> unifyEq e1 e2
 
+-- Disregard method indices when unifying dictionary types.
 instance Unifiable DictType where
-  unifyZonked (DictType _ c params) (DictType _ c' params') =
+  unifyZonked (DictType _ c params _) (DictType _ c' params' _) =
     guard (c == c') >> zipWithM_ unify params params'
   {-# INLINE unifyZonked #-}
 
@@ -2951,23 +2955,31 @@ instance HoistableState RecMethodDefCheckTraverserS where
 
 instance GenericTraverser CoreIR UnitB RecMethodDefCheckTraverserS where
   traverseExpr (App f xs) = do
+    f' <- traverseGenericE f
     xs' <- mapM traverseGenericE xs
-    traverseGenericE f >>= \case
-      f'@(Var m) -> getMethodName m >>= \case
-        Nothing -> return $ App f' xs'
-        Just mname -> lookupEnv mname >>= \case
-          MethodBinding cname' ix' _ -> do
-            forM_ xs' \case
-              DictCon (InstanceDict iname' _) -> do
-                S cname iname ix <- get
-                if (cname == cname' && iname == iname' && ix <= ix')
-                  then throw TypeErr $ "Cannot call method " ++ show ix' ++
-                                        " from within definition of method " ++ show ix ++
-                                        ", in definition of instance " ++ pprint iname
-                  else return ()
-              _ -> return ()
-            return $ App f' xs'
-      f' -> return $ App f' xs'
+    fTy <- getType f'
+    go fTy (toList xs')
+    return $ App f' xs'
+    where
+      go :: Type CoreIR o -> [CAtom o]
+         -> GenericTraverserM CoreIR UnitB RecMethodDefCheckTraverserS i o ()
+      go (Pi (PiType (PiBinder b ty _) _ bodyTy)) (arg:args) = do
+        case ty of
+          DictTy (DictType _ cname' _ idxs) -> case arg of
+            DictCon (InstanceDict iname' _) -> do
+              S cname iname ix <- get
+              if (cname == cname' && iname == iname' && any (>= ix) idxs)
+                then throw TypeErr $ "Cannot use all of the methods " ++ show idxs ++
+                                    " from within definition of method " ++ show ix ++
+                                    ", in definition of instance " ++ pprint iname
+                else return ()
+            _ -> return ()
+          _ -> return ()
+        bodyTy' <- applySubst (b @> SubstVal arg) bodyTy
+        go bodyTy' args
+      go _ []     = return ()
+      go _ _      = error ""
+
   traverseExpr e = traverseExprDefault e
 
 synthInstanceDef
@@ -3101,29 +3113,29 @@ getSuperclassClosurePure env givens newGivens =
       -- TODO: Does this really create a full translation only to inspect the top?
       superclasses <- case synthTy of
         SynthPiType _ -> return []
-        SynthDictType (DictType _ className _) -> do
+        SynthDictType (DictType _ className _ _) -> do
           ClassDef _ _ _ (SuperclassBinders _ superclasses) _ <- lookupClassDef className
           return $ void superclasses
       return $ enumerate superclasses <&> \(i, _) -> DictCon $ SuperclassProj synthExpr i
 
 synthTerm :: SynthType n -> SyntherM n (SynthAtom n)
 synthTerm ty = confuseGHC >>= \_ -> case ty of
-  SynthPiType (Abs (PiBinder b argTy arr) resultTy) ->
-    withFreshBinder (getNameHint b) argTy \b' -> do
-      let v = binderName b'
-      resultTy' <- applyRename (b@>v) resultTy
-      newGivens <- case arr of
-        ClassArrow -> return [Var v]
-        _ -> return []
-      synthExpr <- extendGivens newGivens $ synthTerm resultTy'
-      let lamExpr = UnaryLamExpr b' (AtomicBlock synthExpr)
-      return $ lamExprToAtom lamExpr arr Nothing
-  SynthDictType dictTy -> case dictTy of
-    DictType "Ix" _ [NewtypeTyCon (Fin n)] -> return $ DictCon $ IxFin n
-    DictType "Data" _ [t] -> do
-      void (synthDictForData dictTy <!> synthDictFromGiven dictTy)
-      return $ DictCon $ DataData t
-    _ -> synthDictFromInstance dictTy <!> synthDictFromGiven dictTy
+    SynthPiType (Abs (PiBinder b argTy arr) resultTy) ->
+      withFreshBinder (getNameHint b) argTy \b' -> do
+        let v = binderName b'
+        resultTy' <- applyRename (b@>v) resultTy
+        newGivens <- case arr of
+          ClassArrow -> return [Var v]
+          _ -> return []
+        synthExpr <- extendGivens newGivens $ synthTerm resultTy'
+        let lamExpr = UnaryLamExpr b' (AtomicBlock synthExpr)
+        return $ lamExprToAtom lamExpr arr Nothing
+    SynthDictType dictTy -> case dictTy of
+      DictType "Ix" _ [NewtypeTyCon (Fin n)] _ -> return $ DictCon $ IxFin n
+      DictType "Data" _ [t] _ -> do
+        void (synthDictForData dictTy <!> synthDictFromGiven dictTy)
+        return $ DictCon $ DataData t
+      _ -> synthDictFromInstance dictTy <!> synthDictFromGiven dictTy
 {-# SCC synthTerm #-}
 
 synthDictFromGiven :: DictType n -> SyntherM n (SynthAtom n)
@@ -3137,7 +3149,7 @@ synthDictFromGiven dictTy = do
       Just args' -> return $ DictCon $ InstantiatedGiven given args'
 
 synthDictFromInstance :: DictType n -> SyntherM n (SynthAtom n)
-synthDictFromInstance dictTy@(DictType _ targetClass _) = do
+synthDictFromInstance dictTy@(DictType _ targetClass _ _) = do
   instances <- getInstanceDicts targetClass
   asum $ instances <&> \candidate -> do
     synthTy <- getInstanceType candidate
@@ -3145,7 +3157,7 @@ synthDictFromInstance dictTy@(DictType _ targetClass _) = do
     return $ DictCon $ InstanceDict candidate args
 
 synthDictForData :: forall n. DictType n -> SyntherM n (SynthAtom n)
-synthDictForData dictTy@(DictType "Data" dName [ty]) = case ty of
+synthDictForData dictTy@(DictType "Data" dName [ty] idxs) = case ty of
   -- TODO Deduplicate vs CheckType.checkDataLike
   -- The "Var" case is different
   Var _ -> synthDictFromGiven dictTy
@@ -3165,10 +3177,10 @@ synthDictForData dictTy@(DictType "Data" dName [ty]) = case ty of
     _ -> notData
   _   -> notData
   where
-    recur ty' = synthDictForData $ DictType "Data" dName [ty']
+    recur ty' = synthDictForData $ DictType "Data" dName [ty'] idxs
     recurBinder :: (RenameB b, BindsEnv b) => Abs b CType n -> SyntherM n (SynthAtom n)
     recurBinder bAbs = refreshAbs bAbs \b' ty'' -> do
-      ans <- synthDictForData $ DictType "Data" (sink dName) [ty'']
+      ans <- synthDictForData $ DictType "Data" (sink dName) [ty''] idxs
       return $ ignoreHoistFailure $ hoist b' ans
     notData = empty
     success = return $ DictCon $ DataData ty
@@ -3178,16 +3190,17 @@ synthDictForData dictTy = error $ "Malformed Data dictTy " ++ pprint dictTy
 getInstanceType :: InstanceName n -> SyntherM n (SynthType n)
 getInstanceType instanceName = do
   InstanceDef className bs params _ <- lookupInstanceDef instanceName
-  ClassDef classSourceName _ _ _ _ <- lookupClassDef className
+  ClassDef classSourceName _ _ _ methodTys <- lookupClassDef className
   liftEnvReaderM $ refreshAbs (Abs bs (ListE params)) \bs' (ListE params') -> do
     className' <- sinkM className
-    return $ go bs' classSourceName className' params'
+    let methodIdxs = take (length methodTys) [0..]
+    return $ go methodIdxs bs' classSourceName className' params'
   where
-    go :: Nest RolePiBinder n l -> SourceName -> ClassName l -> [CAtom l] -> SynthType n
-    go bs classSourceName className params = case bs of
-      Empty -> SynthDictType $ DictType classSourceName className params
+    go :: [Int] -> Nest RolePiBinder n l -> SourceName -> ClassName l -> [CAtom l] -> SynthType n
+    go methodIdxs bs classSourceName className params = case bs of
+      Empty -> SynthDictType $ DictType classSourceName className params methodIdxs
       Nest (RolePiBinder b ty arr _) rest ->
-        let restTy = go rest classSourceName className params
+        let restTy = go methodIdxs rest classSourceName className params
         in SynthPiType $ Abs (PiBinder b ty arr) restTy
 {-# SCC getInstanceType #-}
 
@@ -3212,11 +3225,19 @@ instantiateSynthArgsRec prevArgsRec dictTy subst synthTy = case synthTy of
     param <- case arrow of
       ImplicitArrow -> Var <$> freshInferenceName argTy'
       ClassArrow -> return $ DictHole (AlwaysEqual Nothing) argTy'
-      _ -> error $ "Not a valid arrow type for synthesis: " ++ pprint arrow
+      _ -> empty  -- error $ "Not a valid arrow type for synthesis: " ++ pprint arrow
+                  -- TODO: Understand if/why `empty` is OK here, instead of `error`.
     instantiateSynthArgsRec (param:prevArgsRec) dictTy (subst <.> b @> SubstVal param) resultTy
   SynthDictType dictTy' -> do
-    unify dictTy =<< applySubst subst dictTy'
-    return $ reverse prevArgsRec
+    dictTy'' <- applySubst subst dictTy'
+    unify dictTy dictTy''
+    case (dictTy, dictTy'') of
+      (DictType _ _ _ idx, DictType _ _ _ idx'') ->
+        -- Allow this synthesis only if the target `dictTy` requires using fewer
+        -- methods than the `synthTy` grants access to:
+        if (S.fromList idx) `S.isSubsetOf` (S.fromList idx'')
+          then return $ reverse prevArgsRec
+          else empty
 
 instance GenericE Givens where
   type RepE Givens = HashMapE (EKey SynthType) SynthAtom

@@ -1167,7 +1167,10 @@ makeMethodGetter className explicit methodIdx = liftBuilder do
   ClassDef sourceName _ paramBs _ _ <- getClassDef className'
   let arrows = explicit <&> \case True -> PlainArrow; False -> ImplicitArrow
   buildPureNaryLam (EmptyAbs $ zipPiBinders arrows paramBs) \params -> do
-    let dictTy = DictTy $ DictType sourceName (sink className') (map Var params)
+    -- `ProjMethod` accesses exactly one class method, namely the method with
+    -- index `methodIdx`. Record this fact in the argument type of the lambda,
+    -- i.e. in `dictTy`:
+    let dictTy = DictTy $ DictType sourceName (sink className') (map Var params) [methodIdx]
     buildPureLam noHint ClassArrow dictTy \dict ->
       emitExpr $ ProjMethod (Var dict) methodIdx
   where

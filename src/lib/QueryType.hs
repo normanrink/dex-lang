@@ -291,7 +291,7 @@ instance IRRep r => HasType r (Atom r) where
     PtrVar v -> substM v >>= lookupEnv >>= \case
       PtrBinding ty _ -> return $ PtrTy ty
     DictCon dictExpr -> getTypeE dictExpr
-    DictTy (DictType _ _ _) -> return TyKind
+    DictTy (DictType _ _ _ _) -> return TyKind
     NewtypeTyCon con -> getTypeE con
     NewtypeCon con x -> getNewtypeType con x
     RepValAtom repVal -> do RepVal ty _ <- substM repVal; return ty
@@ -354,16 +354,19 @@ dictExprType e = case e of
   InstanceDict instanceName args -> do
     instanceName' <- substM instanceName
     InstanceDef className bs params _ <- lookupInstanceDef instanceName'
-    ClassDef sourceName _ _ _ _ <- lookupClassDef className
+    ClassDef sourceName _ _ _ methodTys <- lookupClassDef className
     args' <- mapM substM args
     let bs' = fmapNest (\(RolePiBinder b _ _ _) -> b) bs
     ListE params' <- applySubst (bs' @@> map SubstVal args') $ ListE params
-    return $ DictTy $ DictType sourceName className params'
+    -- Instance definitions can access all methods defined by the instance, hence
+    -- add all method indices (total number: `length methodTys`) to the returned
+    -- dictionary type.
+    return $ DictTy $ DictType sourceName className params' [0..(length methodTys - 1)]
   InstantiatedGiven given args -> do
     givenTy <- getTypeE given
     typeApp givenTy (toList args)
   SuperclassProj d i -> do
-    DictTy (DictType _ className params) <- getTypeE d
+    DictTy (DictType _ className params _) <- getTypeE d
     ClassDef _ _ bs superclasses _ <- lookupClassDef className
     applySubst (bs @@> map SubstVal params) $
       superclassTypes superclasses !! i
@@ -381,7 +384,8 @@ getIxClassName = lookupSourceMap "Ix" >>= \case
 ixDictType :: (Fallible1 m, EnvReader m) => CType n -> m n (DictType n)
 ixDictType ty = do
   ixClassName <- getIxClassName
-  return $ DictType "Ix" ixClassName [ty]
+  -- The `Ix` class/interface has three methods:
+  return $ DictType "Ix" ixClassName [ty] [0, 1, 2]
 
 getDataClassName :: (Fallible1 m, EnvReader m) => m n (ClassName n)
 getDataClassName = lookupSourceMap "Data" >>= \case
@@ -392,7 +396,8 @@ getDataClassName = lookupSourceMap "Data" >>= \case
 dataDictType :: (Fallible1 m, EnvReader m) => CType n -> m n (DictType n)
 dataDictType ty = do
   dataClassName <- getDataClassName
-  return $ DictType "Data" dataClassName [ty]
+  -- The `Data` class/interface has three methods:
+  return $ DictType "Data" dataClassName [ty] [0]
 
 typeApp  :: IRRep r => Type r o -> [Atom r i] -> TypeQueryM i o (Type r o)
 typeApp fTy [] = return fTy
@@ -440,7 +445,7 @@ instance IRRep r => HasType r (Expr r) where
     Hof  hof -> getTypeHof hof
     Case _ _ resultTy _ -> substM resultTy
     ProjMethod dict i -> do
-      DictTy (DictType _ className params) <- getTypeE dict
+      DictTy (DictType _ className params _) <- getTypeE dict
       def@(ClassDef _ _ paramBs classBs methodTys) <- lookupClassDef className
       let MethodType _ methodTy = methodTys !! i
       superclassDicts <- getSuperclassDicts def <$> substM dict
@@ -722,7 +727,7 @@ getClassTy (ClassDef _ _ bs _ _) = go bs
 ixTyFromDict :: IRRep r => EnvReader m => IxDict r n -> m n (IxType r n)
 ixTyFromDict ixDict = flip IxType ixDict <$> case ixDict of
   IxDictAtom dict -> getType dict >>= \case
-    DictTy (DictType "Ix" _ [iTy]) -> return iTy
+    DictTy (DictType "Ix" _ [iTy] _) -> return iTy
     _ -> error $ "Not an Ix dict: " ++ pprint dict
   IxDictRawFin _ -> return IdxRepTy
   IxDictSpecialized n _ _ -> return n

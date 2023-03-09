@@ -213,7 +213,7 @@ instance GenericallyTraversableE r (IxDict r) where
     IxDictSpecialized t d xs -> IxDictSpecialized <$> tge t <*> substM d <*> mapM tge xs
 
 instance GenericallyTraversableE CoreIR DictType where
-  traverseGenericE (DictType sn cn params) = DictType sn <$> substM cn <*> mapM tge params
+  traverseGenericE (DictType sn cn params idxs) = DictType sn <$> substM cn <*> mapM tge params <*> pure idxs
 
 instance IRRep r => GenericallyTraversableE r (LamExpr r) where
   traverseGenericE (LamExpr bs body) = do

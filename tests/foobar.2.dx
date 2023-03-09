@@ -1,0 +1,21 @@
+
+interface FooBar2 a
+  foo : a -> Int
+  bar : a -> Int
+
+%passes typed
+def f {a:Type} [d:FooBar2 a] (x:a) = (\y. foo y + 1) x
+-- The defintion of `f` is OK because argument `d : FooBar2 a` grants access to
+-- all methods of class `FooBar2 a`. (Only one method of `FooBar2` is actually
+-- used in the body of `f`.)
+
+%passes typed
+def g {a:Type} [d:FooBar2 a] (x:a) = (\y. foo y + 1) (bar x)
+-- The defintion of `g` is OK because argument `d : FooBar2 a` grants access to
+-- all methods of class `FooBar2 a`.
+
+instance FooBar2 Int
+  foo = \x. x + 1
+  -- Fails: The definition of `bar` uses `f`, which requires a dictionary
+  -- `d : FooBar2 Int` that has access to all methods of `FooBar2 Int`.
+  bar = \x. f x + 1
