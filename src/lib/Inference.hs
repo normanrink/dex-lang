@@ -1276,6 +1276,20 @@ matchPrimApp = \case
    combiner' <- lam2 combiner
    f' <- lam2 f
    ee $ Hof $ RunWriter Nothing (BaseMonoid idVal combiner') f'
+ UMakeDictType idxs -> \lambdaAndArgs ->
+  -- The first argument to `UMakeDictType` in the source code (apart from `idxs`)
+  -- should be a class name, which is represented as `UClassVar v`. Hence, a
+  -- prior incovation of `inferUVar` on this `UClassVar v` will have converted
+  -- the first argument of `UMakeDictType` to a function that accepts class
+  -- parameters and ultimately returns a `DictType`. We now extract that `DictType`
+  -- and update it with `idxs`.
+  case head lambdaAndArgs of
+    Lam (LamExpr bs bodyTy) _ _ -> do
+      let args = tail lambdaAndArgs
+      Block _ Empty dTy <- applySubst (bs @@> map SubstVal args) bodyTy
+      let DictTy (DictType sn cn params _) = dTy
+      return $ DictTy $ DictType sn cn params idxs
+    _ -> error ""
  p -> \case xs -> throw TypeErr $ "Bad primitive application: " ++ show (p, xs)
  where
    ee = emitExpr

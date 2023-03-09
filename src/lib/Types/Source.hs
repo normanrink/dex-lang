@@ -422,6 +422,7 @@ data PrimName =
   | UIndexRef | UProjRef Int | UProjMethod Int
   | UNat | UNatCon | UFin | ULabelType
   | UEffectRowKind | ULabeledRowKind
+  | UMakeDictType [Int]
     deriving (Show, Eq)
 
 -- === instances ===

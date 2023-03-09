@@ -718,6 +718,13 @@ leafGroupNoBrackets = do
     '%'  -> do
       name <- primName
       case strToPrimName name of
+        Just (UMakeDictType []) -> do
+          -- TODO: This is a hacky way of extracting a list of `Int`s from a
+          -- string literal in the source file. Find a more structured way of
+          -- extracting the `idxs` argument on `UMakeDictType`.
+          str <- T.strip . T.pack <$> strLit
+          let idxs = map (read . T.unpack . T.strip) $ T.splitOn "," str
+          CPrim (UMakeDictType idxs) <$> many cGroupNoJuxtDot
         Just prim -> CPrim prim <$> many cGroupNoJuxtDot
         Nothing   -> fail $ "Unrecognized primitive: " ++ name
     '#'  -> liftM2 CLabel labelPrefix fieldLabel
@@ -1013,6 +1020,7 @@ primNames = M.fromList
   , ("explicitApply", UExplicitApply)
   , ("monoLit", UMonoLiteral)
   , ("sumToVariant", URecordVariantOp $ SumToVariant ())
+  , ("makeDictType", UMakeDictType [])
   ]
   where
     binary op = UPrimOp $ BinOp op () ()
