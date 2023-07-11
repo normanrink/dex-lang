@@ -48,9 +48,6 @@ nav ol {
   margin: auto;
 }
 
-.cell {
-}
-
 .code-block, .err-block, .result-block {
   padding: 0em 0em 0em 2em;
   display: block;
@@ -150,6 +147,45 @@ function lookup_address(cell, address) {
         node = node.children[address[i]]
     }
     return node
+}
+
+function renderHovertips() {
+    var spans = document.querySelectorAll(&quot;.code-span&quot;);
+    Array.from(spans).map((span) =&gt; attachHovertip(span));
+}
+
+function attachHovertip(node) {
+    node.addEventListener(&quot;mouseover&quot;, (event) =&gt; highlightNode(     event, node));
+    node.addEventListener(&quot;mouseout&quot; , (event) =&gt; removeHighlighting(event, node));
+}
+
+function highlightNode(event, node) {
+    event.stopPropagation();
+    node.style.backgroundColor = &quot;lightblue&quot;;
+    node.style.outlineColor = &quot;lightblue&quot;;
+    node.style.outlineStyle = &quot;solid&quot;;
+    Array.from(node.children).map(function (child) {
+        if (isCodeSpanOrLeaf(child)) {
+            child.style.backgroundColor = &quot;yellow&quot;;
+        }
+    })
+}
+
+function isCodeSpanOrLeaf(node) {
+  return node.classList.contains(&quot;code-span&quot;) || node.classList.contains(&quot;code-span-leaf&quot;)
+
+}
+
+function removeHighlighting(event, node) {
+    event.stopPropagation();
+    node.style.backgroundColor = null;
+    node.style.outlineColor = null;
+    node.style.outlineStyle = null;
+    Array.from(node.children).map(function (child) {
+        if (isCodeSpanOrLeaf(child)) {
+          child.style.backgroundColor = null;
+        }
+    })
 }
 
 function renderLaTeX() {
@@ -263,6 +299,7 @@ function render(renderMode) {
     if (renderMode == RENDER_MODE.STATIC) {
         // For static pages, simply call rendering functions once.
         renderLaTeX();
+        renderHovertips();
         updateNavigation();
     } else {
         // For dynamic pages (via `dex web`), listen to update events.
@@ -301,40 +338,41 @@ function render(renderMode) {
                 Object.assign(cells, new_cells);
             }
             renderLaTeX();
+            renderHovertips();
             updateNavigation();
         };
     }
 }
 render(RENDER_MODE.STATIC);"></script></head><body><div id="main-output"><div class="cell"><div class="code-block"></div></div><div class="cell"><div class="prose-block"><h1>Netpbm</h1>
 </div></div><div class="cell"><div class="prose-block"><p>This is a basic loader for the .ppm P6 image format.</p>
-</div></div><div class="cell"><div class="code-block"><span class="keyword">import</span> parser
-</div></div><div class="cell"><div class="code-block">
-</div></div><div class="cell"><div class="code-block"><span class="keyword">data</span> <span class="type-name">Image</span> <span class="symbol">=</span>
-  <span class="type-name">MkImage</span>(rows<span class="symbol">:</span><span class="type-name">Nat</span><span class="symbol">,</span> cols<span class="symbol">:</span><span class="type-name">Nat</span><span class="symbol">,</span> pixels<span class="symbol">:</span>(<span class="type-name">Fin</span> rows <span class="symbol">=&gt;</span> <span class="type-name">Fin</span> cols <span class="symbol">=&gt;</span> <span class="type-name">Fin</span> 3 <span class="symbol">=&gt;</span> <span class="type-name">Word8</span>))
-</div></div><div class="cell"><div class="code-block">
-</div></div><div class="cell"><div class="code-block">parse_p6 <span class="symbol">:</span> <span class="type-name">Parser</span> <span class="type-name">Image</span> <span class="symbol">=</span> <span class="type-name">MkParser</span> <span class="symbol">\</span>h<span class="symbol">.</span>
-  <span class="comment">-- Loads a raw PPM file in P6 format.
-</span>  <span class="comment">-- The header will look something like:
-</span>  <span class="comment">--   P6
-</span>  <span class="comment">--   220 220    (width, height)
-</span>  <span class="comment">--   255        (max color value)
-</span>  <span class="comment">-- followed by a flat block of height x width x 3 chars.
-</span>  parse h <span class="symbol">$</span> p_char &#39;<span class="type-name">P</span>&#39;
-  parse h <span class="symbol">$</span> p_char &#39;6&#39;
-  parse h <span class="symbol">$</span> parse_any
-  cols <span class="symbol">=</span> i32_to_n <span class="symbol">$</span> parse h <span class="symbol">$</span> parse_unsigned_int
-  parse h <span class="symbol">$</span> parse_any
-  rows <span class="symbol">=</span> i32_to_n <span class="symbol">$</span> parse h <span class="symbol">$</span> parse_unsigned_int
-  parse h <span class="symbol">$</span> parse_any
-  colorsize <span class="symbol">=</span> i32_to_n <span class="symbol">$</span> parse h <span class="symbol">$</span> parse_unsigned_int
-  parse h <span class="symbol">$</span> parse_any
-  pixels <span class="symbol">=</span> <span class="keyword">for</span> r<span class="symbol">:</span>(<span class="type-name">Fin</span> rows)<span class="symbol">.</span>
-    <span class="keyword">for</span> c<span class="symbol">:</span>(<span class="type-name">Fin</span> cols)<span class="symbol">.</span>
-      <span class="keyword">for</span> c<span class="symbol">:</span>(<span class="type-name">Fin</span> 3)<span class="symbol">.</span>
-        parse h parse_any
-  <span class="type-name">MkImage</span> rows cols pixels
-</div></div><div class="cell"><div class="code-block">
-</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> load_image_p6(filename<span class="symbol">:</span><span class="type-name">String</span>) <span class="symbol">-&gt;</span> <span class="type-name">Maybe</span> <span class="type-name">Image</span> <span class="symbol">=</span>
-  image_raw <span class="symbol">=</span> unsafe_io <span class="symbol">\.</span> read_file filename
-  run_parser_partial image_raw parse_p6
-</div></div></div></body></html>
+</div></div><div class="cell"><div class="code-block"><span class="keyword">import</span><span class="whitespace"> </span>parser<span class="whitespace">
+</span></div></div><div class="cell"><div class="code-block"><span class="whitespace">
+</span></div></div><div class="cell"><div class="code-block"><span class="code-span"><span class="code-span"><span class="keyword">data</span><span class="whitespace"> </span><span class="type-name">Image</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace">
+  </span><span class="type-name">MkImage</span>(<span class="code-span"><span class="code-span-leaf">rows</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span-leaf"><span class="type-name">Nat</span></span></span><span class="symbol">,</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">cols</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span-leaf"><span class="type-name">Nat</span></span></span><span class="symbol">,</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">pixels</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span">(<span class="code-span"><span class="code-span"><span class="code-span-leaf"><span class="type-name">Fin</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>rows<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">=&gt;</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span"><span class="code-span-leaf"><span class="type-name">Fin</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>cols<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">=&gt;</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span"><span class="code-span-leaf"><span class="type-name">Fin</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>3<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">=&gt;</span></span><span class="whitespace"> </span><span class="code-span-leaf"><span class="type-name">Word8</span></span></span></span></span>)</span></span>)<span class="whitespace">
+</span></span></span></div></div><div class="cell"><div class="code-block"><span class="whitespace">
+</span></div></div><div class="cell"><div class="code-block"><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse_p6</span><span class="whitespace"> </span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"><span class="type-name">Parser</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span><span class="type-name">Image</span><span class="whitespace"> </span></span></span></span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"><span class="type-name">MkParser</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span><span class="symbol">\</span><span class="code-span-leaf">h</span><span class="symbol">.</span><span class="whitespace">
+  </span><span class="comment">-- Loads a raw PPM file in P6 format.
+</span><span class="whitespace">  </span><span class="comment">-- The header will look something like:
+</span><span class="whitespace">  </span><span class="comment">--   P6
+</span><span class="whitespace">  </span><span class="comment">--   220 220    (width, height)
+</span><span class="whitespace">  </span><span class="comment">--   255        (max color value)
+</span><span class="whitespace">  </span><span class="comment">-- followed by a flat block of height x width x 3 chars.</span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>h<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">p_char</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>&#39;<span class="type-name">P</span>&#39;</span></span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>h<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">p_char</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>&#39;6&#39;</span></span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>h<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span-leaf">parse_any</span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span-leaf">cols</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">i32_to_n</span><span class="whitespace"> </span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>h<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span-leaf">parse_unsigned_int</span></span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>h<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span-leaf">parse_any</span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span-leaf">rows</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">i32_to_n</span><span class="whitespace"> </span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>h<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span-leaf">parse_unsigned_int</span></span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>h<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span-leaf">parse_any</span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span-leaf">colorsize</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">i32_to_n</span><span class="whitespace"> </span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>h<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span-leaf">parse_unsigned_int</span></span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>h<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">$</span></span><span class="whitespace"> </span><span class="code-span-leaf">parse_any</span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span-leaf">pixels</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="keyword">for</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">r</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span">(<span class="code-span"><span class="code-span-leaf"><span class="type-name">Fin</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>rows</span></span>)</span></span><span class="symbol">.</span><span class="whitespace">
+    </span><span class="code-span"><span class="code-span"><span class="keyword">for</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">c</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span">(<span class="code-span"><span class="code-span-leaf"><span class="type-name">Fin</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>cols</span></span>)</span></span><span class="symbol">.</span><span class="whitespace">
+      </span><span class="code-span"><span class="code-span"><span class="keyword">for</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">c</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span">(<span class="code-span"><span class="code-span-leaf"><span class="type-name">Fin</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>3</span></span>)</span></span><span class="symbol">.</span><span class="whitespace">
+        </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">parse</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>h<span class="whitespace"> </span></span></span><span class="code-span"><span class="code-span-leaf"></span>parse_any</span></span></span></span></span></span></span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf"><span class="type-name">MkImage</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>rows<span class="whitespace"> </span></span></span><span class="code-span"><span class="code-span-leaf"></span>cols<span class="whitespace"> </span></span></span><span class="code-span"><span class="code-span-leaf"></span>pixels</span></span></span></span></span></span><span class="whitespace">
+</span></span></div></div><div class="cell"><div class="code-block"><span class="whitespace">
+</span></div></div><div class="cell"><div class="code-block"><span class="code-span"><span class="code-span"><span class="keyword">def</span><span class="whitespace"> </span>load_image_p6(<span class="code-span"><span class="code-span-leaf">filename</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span-leaf"><span class="type-name">String</span></span></span>)<span class="whitespace"> </span><span class="symbol">-&gt;</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"><span class="type-name">Maybe</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span><span class="type-name">Image</span><span class="whitespace"> </span></span></span><span class="symbol">=</span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span-leaf">image_raw</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">unsafe_io</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span><span class="symbol">\.</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">read_file</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>filename</span></span></span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">run_parser_partial</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>image_raw<span class="whitespace"> </span></span></span><span class="code-span"><span class="code-span-leaf"></span>parse_p6</span></span></span></span><span class="whitespace">
+</span></span></div></div></div></body></html>

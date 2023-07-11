@@ -48,9 +48,6 @@ nav ol {
   margin: auto;
 }
 
-.cell {
-}
-
 .code-block, .err-block, .result-block {
   padding: 0em 0em 0em 2em;
   display: block;
@@ -150,6 +147,45 @@ function lookup_address(cell, address) {
         node = node.children[address[i]]
     }
     return node
+}
+
+function renderHovertips() {
+    var spans = document.querySelectorAll(&quot;.code-span&quot;);
+    Array.from(spans).map((span) =&gt; attachHovertip(span));
+}
+
+function attachHovertip(node) {
+    node.addEventListener(&quot;mouseover&quot;, (event) =&gt; highlightNode(     event, node));
+    node.addEventListener(&quot;mouseout&quot; , (event) =&gt; removeHighlighting(event, node));
+}
+
+function highlightNode(event, node) {
+    event.stopPropagation();
+    node.style.backgroundColor = &quot;lightblue&quot;;
+    node.style.outlineColor = &quot;lightblue&quot;;
+    node.style.outlineStyle = &quot;solid&quot;;
+    Array.from(node.children).map(function (child) {
+        if (isCodeSpanOrLeaf(child)) {
+            child.style.backgroundColor = &quot;yellow&quot;;
+        }
+    })
+}
+
+function isCodeSpanOrLeaf(node) {
+  return node.classList.contains(&quot;code-span&quot;) || node.classList.contains(&quot;code-span-leaf&quot;)
+
+}
+
+function removeHighlighting(event, node) {
+    event.stopPropagation();
+    node.style.backgroundColor = null;
+    node.style.outlineColor = null;
+    node.style.outlineStyle = null;
+    Array.from(node.children).map(function (child) {
+        if (isCodeSpanOrLeaf(child)) {
+          child.style.backgroundColor = null;
+        }
+    })
 }
 
 function renderLaTeX() {
@@ -263,6 +299,7 @@ function render(renderMode) {
     if (renderMode == RENDER_MODE.STATIC) {
         // For static pages, simply call rendering functions once.
         renderLaTeX();
+        renderHovertips();
         updateNavigation();
     } else {
         // For dynamic pages (via `dex web`), listen to update events.
@@ -301,6 +338,7 @@ function render(renderMode) {
                 Object.assign(cells, new_cells);
             }
             renderLaTeX();
+            renderHovertips();
             updateNavigation();
         };
     }
@@ -312,24 +350,24 @@ render(RENDER_MODE.STATIC);"></script></head><body><div id="main-output"><div cl
 </div></div><div class="cell"><div class="prose-block"><p>$$\text{Area of unit square: } \\ A_{square} = 1$$</p>
 </div></div><div class="cell"><div class="prose-block"><p>$$\text{Compute } \pi \text{ via ratios: } \\ \frac{A_{quadrant}}{A_{square}} = \frac{\pi}{4}, \; \pi = 4 \thinspace \frac{A_{quadrant}}{A_{square}} $$</p>
 </div></div><div class="cell"><div class="prose-block"><p>To compute $\pi$, randomly sample points in the first quadrant unit square to estimate the $\frac{A_{quadrant}}{A_{square}}$ ratio. Then, multiply by $4$.</p>
-</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> estimatePiArea(key<span class="symbol">:</span><span class="type-name">Key</span>) <span class="symbol">-&gt;</span> <span class="type-name">Float</span> <span class="symbol">=</span>
-  [k1<span class="symbol">,</span> k2] <span class="symbol">=</span> split_key key
-  x <span class="symbol">=</span> rand k1
-  y <span class="symbol">=</span> rand k2
-  inBounds <span class="symbol">=</span> (sq x <span class="symbol">+</span> sq y) <span class="symbol">&lt;</span> 1<span class="symbol">.</span>0
-  4<span class="symbol">.</span>0 <span class="symbol">*</span> b_to_f inBounds
-</div></div><div class="cell"><div class="code-block">
-</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> estimatePiAvgVal(key<span class="symbol">:</span><span class="type-name">Key</span>) <span class="symbol">-&gt;</span> <span class="type-name">Float</span> <span class="symbol">=</span>
-  x <span class="symbol">=</span> rand key
-  4<span class="symbol">.</span>0 <span class="symbol">*</span> sqrt (1<span class="symbol">.</span>0 <span class="symbol">-</span> sq x)
-</div></div><div class="cell"><div class="code-block">
-</div></div><div class="cell"><div class="code-block"><span class="keyword">def</span> meanAndStdDev(n<span class="symbol">:</span><span class="type-name">Nat</span><span class="symbol">,</span> f<span class="symbol">:</span> (<span class="type-name">Key</span>) <span class="symbol">-&gt;</span> <span class="type-name">Float</span><span class="symbol">,</span> key<span class="symbol">:</span><span class="type-name">Key</span>) <span class="symbol">-&gt;</span> (<span class="type-name">Float</span><span class="symbol">,</span> <span class="type-name">Float</span>) <span class="symbol">=</span>
-  samps <span class="symbol">=</span> <span class="keyword">for</span> i<span class="symbol">:</span>(<span class="type-name">Fin</span> n)<span class="symbol">.</span> many f key i
-  (mean samps<span class="symbol">,</span> std samps)
-</div></div><div class="cell"><div class="code-block">
-</div></div><div class="cell"><div class="code-block">numSamps <span class="symbol">=</span> 1000000
-</div></div><div class="cell"><div class="code-block">
-</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> meanAndStdDev numSamps estimatePiArea (new_key 0)
-</div><div class="result-block">(3.141656, 1.64214)</div></div><div class="cell"><div class="code-block">
-</div></div><div class="cell"><div class="code-block"><span class="command">:p</span> meanAndStdDev numSamps estimatePiAvgVal (new_key 0)
-</div><div class="result-block">(3.145509, 0.886251)</div></div></div></body></html>
+</div></div><div class="cell"><div class="code-block"><span class="code-span"><span class="code-span"><span class="keyword">def</span><span class="whitespace"> </span>estimatePiArea(<span class="code-span"><span class="code-span-leaf">key</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span-leaf"><span class="type-name">Key</span></span></span>)<span class="whitespace"> </span><span class="symbol">-&gt;</span><span class="whitespace"> </span><span class="code-span-leaf"><span class="type-name">Float</span></span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span">[<span class="code-span-leaf">k1</span><span class="symbol">,</span><span class="whitespace"> </span><span class="code-span-leaf">k2</span>]<span class="whitespace"> </span></span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">split_key</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>key</span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span-leaf">x</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">rand</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>k1</span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span-leaf">y</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">rand</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>k2</span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span-leaf">inBounds</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="code-span">(<span class="code-span"><span class="code-span"><span class="code-span-leaf">sq</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>x<span class="whitespace"> </span></span></span><span class="code-span-leaf"><span class="symbol">+</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">sq</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>y</span></span></span>)<span class="whitespace"> </span></span><span class="code-span-leaf"><span class="symbol">&lt;</span></span><span class="whitespace"> </span><span class="code-span-leaf">1<span class="symbol">.</span>0</span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span"><span class="code-span-leaf">4<span class="symbol">.</span>0</span><span class="whitespace"> </span><span class="code-span-leaf"><span class="symbol">*</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">b_to_f</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>inBounds</span></span></span></span></span><span class="whitespace">
+</span></span></div></div><div class="cell"><div class="code-block"><span class="whitespace">
+</span></div></div><div class="cell"><div class="code-block"><span class="code-span"><span class="code-span"><span class="keyword">def</span><span class="whitespace"> </span>estimatePiAvgVal(<span class="code-span"><span class="code-span-leaf">key</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span-leaf"><span class="type-name">Key</span></span></span>)<span class="whitespace"> </span><span class="symbol">-&gt;</span><span class="whitespace"> </span><span class="code-span-leaf"><span class="type-name">Float</span></span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span-leaf">x</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">rand</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>key</span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span"><span class="code-span-leaf">4<span class="symbol">.</span>0</span><span class="whitespace"> </span><span class="code-span-leaf"><span class="symbol">*</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">sqrt</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>(<span class="code-span"><span class="code-span-leaf">1<span class="symbol">.</span>0</span><span class="whitespace"> </span><span class="code-span-leaf"><span class="symbol">-</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">sq</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>x</span></span></span>)</span></span></span></span></span><span class="whitespace">
+</span></span></div></div><div class="cell"><div class="code-block"><span class="whitespace">
+</span></div></div><div class="cell"><div class="code-block"><span class="code-span"><span class="code-span"><span class="keyword">def</span><span class="whitespace"> </span>meanAndStdDev(<span class="code-span"><span class="code-span-leaf">n</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span-leaf"><span class="type-name">Nat</span></span></span><span class="symbol">,</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">f</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="whitespace"> </span><span class="code-span">(<span class="code-span-leaf"><span class="type-name">Key</span></span>)<span class="whitespace"> </span></span><span class="code-span-leaf"><span class="symbol">-&gt;</span></span><span class="whitespace"> </span></span><span class="code-span-leaf"><span class="type-name">Float</span></span><span class="symbol">,</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">key</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span-leaf"><span class="type-name">Key</span></span></span>)<span class="whitespace"> </span><span class="symbol">-&gt;</span><span class="whitespace"> </span><span class="code-span">(<span class="code-span-leaf"><span class="type-name">Float</span></span><span class="symbol">,</span><span class="whitespace"> </span><span class="code-span-leaf"><span class="type-name">Float</span></span>)<span class="whitespace"> </span></span><span class="symbol">=</span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span-leaf">samps</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span"><span class="keyword">for</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">i</span><span class="code-span-leaf"><span class="symbol">:</span></span><span class="code-span">(<span class="code-span"><span class="code-span-leaf"><span class="type-name">Fin</span></span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>n</span></span>)</span></span><span class="symbol">.</span><span class="whitespace"> </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">many</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>f<span class="whitespace"> </span></span></span><span class="code-span"><span class="code-span-leaf"></span>key<span class="whitespace"> </span></span></span><span class="code-span"><span class="code-span-leaf"></span>i</span></span></span></span><span class="whitespace">
+  </span><span class="code-span"><span class="code-span">(<span class="code-span"><span class="code-span-leaf">mean</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>samps</span></span><span class="symbol">,</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf">std</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>samps</span></span>)</span></span></span><span class="whitespace">
+</span></span></div></div><div class="cell"><div class="code-block"><span class="whitespace">
+</span></div></div><div class="cell"><div class="code-block"><span class="code-span"><span class="code-span"><span class="code-span-leaf">numSamps</span><span class="whitespace"> </span><span class="symbol">=</span><span class="whitespace"> </span><span class="code-span-leaf">1000000</span></span><span class="whitespace">
+</span></span></div></div><div class="cell"><div class="code-block"><span class="whitespace">
+</span></div></div><div class="cell"><div class="code-block"><span class="code-span"><span class="command">:p</span><span class="whitespace"> </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">meanAndStdDev</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>numSamps<span class="whitespace"> </span></span></span><span class="code-span"><span class="code-span-leaf"></span>estimatePiArea<span class="whitespace"> </span></span></span><span class="code-span"><span class="code-span-leaf"></span>(<span class="code-span"><span class="code-span-leaf">new_key</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>0</span></span>)</span></span><span class="whitespace">
+</span></span></div><div class="result-block">(3.141656, 1.64214)</div></div><div class="cell"><div class="code-block"><span class="whitespace">
+</span></div></div><div class="cell"><div class="code-block"><span class="code-span"><span class="command">:p</span><span class="whitespace"> </span><span class="code-span"><span class="code-span"><span class="code-span"><span class="code-span-leaf">meanAndStdDev</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>numSamps<span class="whitespace"> </span></span></span><span class="code-span"><span class="code-span-leaf"></span>estimatePiAvgVal<span class="whitespace"> </span></span></span><span class="code-span"><span class="code-span-leaf"></span>(<span class="code-span"><span class="code-span-leaf">new_key</span><span class="whitespace"> </span><span class="code-span"><span class="code-span-leaf"></span>0</span></span>)</span></span><span class="whitespace">
+</span></span></div><div class="result-block">(3.145509, 0.886251)</div></div></div></body></html>
